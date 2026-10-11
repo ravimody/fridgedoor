@@ -1,0 +1,16 @@
+node_modules/
+dist/
+data/
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+playwright-report/
+test-results/
+.DS_Store
+ios/*.xcodeproj/
+ios/**/xcuserdata/
+ios/Config/Local.xcconfig
+ios/build/
+*.local

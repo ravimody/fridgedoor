@@ -1,0 +1,5 @@
+# Automatic HTTPS (Let's Encrypt) for your domain. DOMAIN comes from .env.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy fridgedoor:8080
+}

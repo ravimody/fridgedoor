@@ -1,0 +1,14 @@
+#cloud-config
+# Paste this as "user data" / "startup script" when creating a Linux VM on any cloud
+# (Oracle, Google Cloud, AWS, Azure, DigitalOcean, Vultr, Linode, Hetzner, OVH...).
+# Edit the environment line first: pick how phones reach the server over HTTPS.
+#   FRIDGEDOOR_HTTPS=domain    DOMAIN=fridgedoor.example.com   (DNS must already point at the VM; open ports 80 and 443)
+#   FRIDGEDOOR_HTTPS=tailscale TS_AUTHKEY=tskey-auth-...       (no open ports needed)
+# The setup link ends up in /var/log/fridgedoor-install.log:  sudo tail /var/log/fridgedoor-install.log
+package_update: true
+packages: [curl, ca-certificates]
+runcmd:
+  # Small VMs (1 GB) are happier with some swap.
+  - [sh, -c, 'if [ ! -f /swapfile ] && [ "$(free -m | awk "/Mem:/ {print \$2}")" -lt 2000 ]; then fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo "/swapfile none swap sw 0 0" >> /etc/fstab; fi']
+  - [sh, -c, 'curl -fsSL https://raw.githubusercontent.com/ravimody/fridgedoor/main/deploy/install.sh -o /root/fridgedoor-install.sh']
+  - [sh, -c, 'umask 077; FRIDGEDOOR_YES=1 FRIDGEDOOR_HTTPS=domain DOMAIN=fridgedoor.example.com bash /root/fridgedoor-install.sh > /var/log/fridgedoor-install.log 2>&1']

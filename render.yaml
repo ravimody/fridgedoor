@@ -1,0 +1,17 @@
+# Render Blueprint: New > Blueprint, pick this repository. Needs a paid instance
+# (free instances sleep and can't have a disk). See docs/hosting/render.md.
+services:
+  - type: web
+    name: fridgedoor
+    runtime: image
+    image:
+      url: ghcr.io/ravimody/fridgedoor:latest
+    plan: starter
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATA_DIR
+        value: /data
+    disk:
+      name: fridgedoor-data
+      mountPath: /data
+      sizeGB: 1

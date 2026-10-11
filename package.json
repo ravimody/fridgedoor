@@ -1,0 +1,27 @@
+{
+  "name": "fridgedoor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {"node": ">=22 <26"},
+  "scripts": {
+    "dev": "pnpm --parallel --filter './server' --filter './web' run dev",
+    "build": "pnpm --filter @fridgedoor/contracts build && pnpm --filter @fridgedoor/server build && pnpm --filter @fridgedoor/web build",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint .",
+    "test": "pnpm -r --if-present run test",
+    "test:e2e": "playwright test",
+    "db:migrate": "pnpm --filter @fridgedoor/server db:migrate"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@playwright/test": "^1.50.1",
+    "@types/node": "^22.10.5",
+    "eslint": "^9.18.0",
+    "globals": "^15.14.0",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.20.0"
+  },
+  "pnpm": {"onlyBuiltDependencies": ["better-sqlite3", "esbuild"]}
+}

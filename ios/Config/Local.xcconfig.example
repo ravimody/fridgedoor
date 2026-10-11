@@ -1,0 +1,9 @@
+// Copy to Local.xcconfig (gitignored), then run `xcodegen generate`.
+//
+// Your Apple Developer team id: Xcode → Settings → Accounts → your team, or
+// developer.apple.com → Membership. A free personal team works too (see README).
+DEVELOPMENT_TEAM = ABCDE12345
+
+// A reverse-DNS prefix you control. Bundle ids, the App Group and Keychain
+// groups are all derived from it, so it must be unique to your team.
+FRIDGEDOOR_BUNDLE_PREFIX = com.example.fridgedoor

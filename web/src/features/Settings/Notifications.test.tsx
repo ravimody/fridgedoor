@@ -1,0 +1,30 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { apiFetch } from '../../api/client.js';
+import { Notifications } from './Notifications.js';
+vi.mock('../../api/client.js', () => ({ apiFetch: vi.fn() }));
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.resetAllMocks(); });
+
+it('does not call another enrolled phone this phone and waits for worker readiness before subscribing', async () => {
+  const requestPermission = vi.fn().mockResolvedValue('granted');
+  vi.stubGlobal('Notification', { permission: 'default', requestPermission });
+  vi.stubGlobal('PushManager', {});
+  const subscription = { endpoint: 'https://web.push.apple.com/fixture', getKey: () => new Uint8Array([1, 2]).buffer };
+  const subscribe = vi.fn().mockResolvedValue(subscription);
+  let activate!: (value: ServiceWorkerRegistration) => void;
+  const registration = { pushManager: { getSubscription: vi.fn().mockResolvedValue(null), subscribe } } as unknown as ServiceWorkerRegistration;
+  Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: { getRegistration: vi.fn().mockResolvedValue(undefined), register: vi.fn().mockResolvedValue(registration), ready: new Promise<ServiceWorkerRegistration>((resolve) => { activate = resolve; }) } });
+  vi.mocked(apiFetch).mockImplementation(async (path, init) => ({ data: path === '/push-config' ? { enabled: true, publicKey: 'fixture-key' } : init?.method === 'POST' ? { id: 'this-phone', state: 'accepted' } : { subscriptions: [{ id: 'other-phone', status: 'enabled', endpointHash: 'other' }] } }));
+  render(<Notifications />);
+  await screen.findByText(/This phone is not enrolled for your account/);
+  fireEvent.click(screen.getByRole('button', { name: 'Enable notifications' }));
+  expect(requestPermission).toHaveBeenCalledOnce();
+  await waitFor(() => expect(navigator.serviceWorker.register).toHaveBeenCalledWith('/pwa/sw.js?v=4', { scope: '/dashboard/' }));
+  expect(subscribe).not.toHaveBeenCalled();
+  activate(registration);
+  await screen.findByText('Notifications are enabled on this phone.');
+  expect(subscribe).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: 'Send test notification' }));
+  await screen.findByText(/Test accepted by the delivery service/);
+  expect(apiFetch).toHaveBeenCalledWith('/push-subscriptions/this-phone/test', { method: 'POST' });
+});

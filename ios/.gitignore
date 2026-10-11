@@ -1,0 +1,5 @@
+Fridgedoor.xcodeproj/
+build/
+DerivedData/
+.swiftpm/
+FridgedoorKit/.build/
