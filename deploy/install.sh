@@ -80,26 +80,26 @@ case "$FRIDGEDOOR_HTTPS" in
   domain) ask "Domain name (e.g. fridgedoor.example.com): " DOMAIN; set_env DOMAIN "$DOMAIN"; set_env PUBLIC_URL "https://$DOMAIN"; set_env FRIDGEDOOR_BIND 127.0.0.1; set_env TRUST_PROXY true; PROFILE=(--profile caddy); BASE="https://$DOMAIN";;
   tailscale) grep -q '^TS_AUTHKEY=' .env || { ask "Tailscale auth key (input hidden): " TS_AUTHKEY secret; set_env TS_AUTHKEY "$TS_AUTHKEY"; }; [ "${TS_FUNNEL:-true}" = "false" ] && set_env TS_SERVE_FILE tailscale-serve-private.json; set_env FRIDGEDOOR_BIND 127.0.0.1; set_env TRUST_PROXY true; PROFILE=(--profile tailscale);;
   cloudflare) grep -q '^TUNNEL_TOKEN=' .env || { ask "Cloudflare Tunnel token (input hidden): " TUNNEL_TOKEN secret; set_env TUNNEL_TOKEN "$TUNNEL_TOKEN"; }; ask "Public hostname routed to the tunnel (e.g. fridgedoor.example.com): " PUBLIC_HOST; set_env PUBLIC_URL "https://$PUBLIC_HOST"; set_env FRIDGEDOOR_BIND 127.0.0.1; set_env TRUST_PROXY true; PROFILE=(--profile cloudflare); BASE="https://$PUBLIC_HOST";;
-  none) BASE="http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost):8080";;
+  none) BASE="http://$(hostname -I 2>/dev/null | awk '{print $1}' || echo localhost):$(previous FRIDGEDOOR_PORT | grep . || echo 8080)";;
   *) die "FRIDGEDOOR_HTTPS must be domain, tailscale, cloudflare or none";;
 esac
 chmod 600 .env
 
 # 4. Start
 say "Starting Fridgedoor in $DIR ..."
-$DOCKER compose ${PROFILE[@]+"${PROFILE[@]}"} pull --quiet
-$DOCKER compose ${PROFILE[@]+"${PROFILE[@]}"} up -d
+$DOCKER compose ${PROFILE[@]+"${PROFILE[@]}"} pull --quiet </dev/null
+$DOCKER compose ${PROFILE[@]+"${PROFILE[@]}"} up -d </dev/null
 for _ in $(seq 1 60); do
-  if $DOCKER compose exec -T fridgedoor node -e "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then break; fi
+  if $DOCKER compose exec -T fridgedoor node -e "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" </dev/null >/dev/null 2>&1; then break; fi
   sleep 2
 done
 if [ "$FRIDGEDOOR_HTTPS" = "tailscale" ]; then
-  for _ in $(seq 1 30); do HOSTNAME_TS=$($DOCKER compose exec -T tailscale tailscale status --json 2>/dev/null | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1); [ -n "${HOSTNAME_TS:-}" ] && break; sleep 2; done
+  for _ in $(seq 1 30); do HOSTNAME_TS=$($DOCKER compose exec -T tailscale tailscale status --json </dev/null 2>/dev/null | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1); [ -n "${HOSTNAME_TS:-}" ] && break; sleep 2; done
   [ -n "${HOSTNAME_TS:-}" ] || die "Tailscale didn't come up; check 'docker compose logs tailscale'."
   BASE="https://$HOSTNAME_TS"
 fi
 
-LINK=$($DOCKER compose exec -T fridgedoor fridgedoor setup-link)
+LINK=$($DOCKER compose exec -T fridgedoor fridgedoor setup-link </dev/null)
 case "$LINK" in
   http*/dashboard/setup*) say "Fridgedoor is running. Finish setup in your browser:"; echo; echo "  ${BASE}/dashboard/setup${LINK#*/dashboard/setup}"; echo;;
   *) say "Fridgedoor is running."; echo "$LINK";;
