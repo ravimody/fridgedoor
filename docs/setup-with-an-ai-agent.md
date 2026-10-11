@@ -148,6 +148,6 @@ costs per month, how to upgrade, and where backups go.
 | Setup fails with "forbidden" | The page was opened at a different address than the server sees. Open it at the public address, or set `PUBLIC_URL` in `.env` and restart. |
 | Sign-in works on one address but not another | Fridgedoor accepts one public address. Change it in Settings → Server, or `fridgedoor public-url https://…`. |
 | iPhone app can't connect | It needs HTTPS (or a local network address). Check the address works in Safari on the phone. |
-| `docker compose up` complains about `DOMAIN`, `TS_AUTHKEY` or `TUNNEL_TOKEN` | The chosen profile needs that value in `.env`. |
+| The `caddy`, `tailscale` or `cloudflared` container keeps restarting | Its value is missing from `.env`: `DOMAIN`, `TS_AUTHKEY` or `TUNNEL_TOKEN`. Check `docker compose logs <service>`. |
 | Container restarts with permission errors on `/data` | A bind mount owned by another user. Use the named volume from `compose.yaml`, or `chown -R 1000:1000` the folder. |
 | Out of memory on a 1 GB VM | Add swap (the cloud-init file does this). |

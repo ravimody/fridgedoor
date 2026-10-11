@@ -31,7 +31,8 @@ services:
     restart: unless-stopped
     ports: ["80:80", "443:443", "443:443/udp"]
     environment:
-      DOMAIN: ${DOMAIN:?Set DOMAIN in .env to the name that points at this server}
+      # Required for this profile: the name that points at this server.
+      DOMAIN: ${DOMAIN:-}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -44,7 +45,8 @@ services:
     hostname: ${TS_HOSTNAME:-fridgedoor}
     restart: unless-stopped
     environment:
-      TS_AUTHKEY: ${TS_AUTHKEY:?Set TS_AUTHKEY in .env (an auth key from the Tailscale admin console)}
+      # Required for this profile: an auth key from the Tailscale admin console.
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
       TS_STATE_DIR: /var/lib/tailscale
       TS_SERVE_CONFIG: /config/serve.json
       TS_USERSPACE: "true"
@@ -60,7 +62,8 @@ services:
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
-      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Set TUNNEL_TOKEN in .env (from Cloudflare Zero Trust > Networks > Tunnels)}
+      # Required for this profile: from Cloudflare Zero Trust > Networks > Tunnels.
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
     depends_on: [fridgedoor]
 
 volumes:
