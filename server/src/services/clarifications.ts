@@ -18,7 +18,7 @@ export class ClarificationService {
     const now = this.clock();
     for (const question of overview.questions) {
       const candidates = question.refs.map((ref) => current.get(ref)).filter((candidate): candidate is DailyContext['candidates'][number] => Boolean(candidate));
-      if (candidates.length !== question.refs.length) continue;
+      if (candidates.length !== question.refs.length || eventsStarted(question.refs, context)) continue;
       const snapshot = candidates.map(({ ref, navigation, sourceRefs, revision, generation, state }) => ({ ref, navigation, sourceRefs, revision, generation, state }));
       const targetRelation = JSON.stringify(snapshot.map(({ navigation }) => navigation).sort((a, b) => `${a.kind}:${a.id}`.localeCompare(`${b.kind}:${b.id}`)));
       const targetKey = indexKey(targetRelation, this.key);
@@ -86,6 +86,7 @@ export class ClarificationService {
 
   private current(manifest: Manifest, context: DailyContext) {
     const byRef = new Map(context.candidates.map((candidate) => [candidate.ref, candidate]));
+    if (eventsStarted(manifest.refs, context)) return false;
     return manifest.refs.every((ref) => byRef.has(ref)) && manifest.candidates.every((saved) => {
       const current = context.candidates.find((candidate) => candidate.navigation.kind === saved.navigation.kind && candidate.navigation.id === saved.navigation.id);
       return Boolean(current && JSON.stringify({ sourceRefs: current.sourceRefs, revision: current.revision, generation: current.generation, state: current.state }) === JSON.stringify({ sourceRefs: saved.sourceRefs, revision: saved.revision, generation: saved.generation, state: saved.state }));
@@ -98,4 +99,15 @@ export class ClarificationService {
 
   private manifest(row: Row) { return decryptJson<Manifest>(JSON.parse(row.encrypted_source_manifest) as Envelope, this.key, `clarification-manifest:${row.id}`); }
   private member(actor: DailyContextActor) { if (!this.db.prepare('SELECT 1 FROM members WHERE id = ? AND household_id = ? AND active = 1').get(actor.memberId, actor.householdId)) throw new Error('NOT_FOUND'); }
+}
+
+// A question about an event is moot once the event has begun, even while it is still on today's plan.
+// Deadlines and undated items never end a question this way; overdue tasks still need an owner.
+function eventsStarted(refs: string[], context: DailyContext) {
+  const times = context.candidates.filter((candidate) => refs.includes(candidate.ref)).flatMap((candidate) => candidate.normalizedTime ? [candidate.normalizedTime] : []);
+  const now = Date.parse(context.referenceTime);
+  return times.some((time) => time.kind === 'timed' || time.kind === 'all_day') && times.every((time) =>
+    time.kind === 'timed' ? Date.parse(time.start) <= now
+      : time.kind === 'all_day' ? time.startDate < context.referenceDate
+        : time.kind === 'deadline' && Date.parse(time.at) <= now);
 }

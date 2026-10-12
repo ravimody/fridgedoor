@@ -52,6 +52,17 @@ describe('daily overview service', () => {
     db.close();
   });
 
+  it('retires a decision once its event has started', async () => {
+    const db = seed();
+    new PlanRepository(db, key, () => now).createPrivate(actor, { title: 'Synthetic campout', category: 'activity', participants: [], time: { kind: 'timed', start: '2026-03-09T18:00:00-04:00', end: '2026-03-10T10:00:00-04:00', timezone: 'America/New_York' }, preparationTasks: [], unresolvedFields: [] });
+    const provider = providerFor((context) => ({ result: { summary: 'Synthetic result', items: [], questions: [{ refs: [context.candidates[0]!.ref], text: 'Does the organizer need a meal note?', reason: 'Synthetic reason.' }], omittedRefs: [] }, usage: { inputTokens: 1, outputTokens: 1 }, provider: 'fake', model: 'synthetic' }));
+    await new DailyOverviewService(db, key, provider, 'synthetic', () => now).generate(actor, 'request-event');
+    expect(new ClarificationService(db, key, () => now).list(actor)).toHaveLength(1);
+    expect(new ClarificationService(db, key, () => new Date('2026-03-09T22:30:00.000Z')).list(actor)).toEqual([]);
+    expect(db.prepare('SELECT state FROM clarifications').get()).toEqual({ state: 'expired' });
+    db.close();
+  });
+
   it('reports unavailable without substitute items and records usage for malformed and unknown model output', async () => {
     for (const result of [{ summary: 'missing fields' }, { summary: 'bad ref', items: [{ refs: ['unknown'], category: 'today', headline: 'Bad', detail: '', priority: 'routine' }], questions: [], omittedRefs: [] }]) {
       const db = seed(); addPlan(db);
