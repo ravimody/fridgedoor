@@ -6,7 +6,7 @@ import SwiftUI
 /// pairs with their household's server (QR code), types its address, or follows
 /// the setup guide. Once a server is known, this offers browser sign-in to it.
 struct WelcomeView: View {
-    static let setupGuide = URL(string: "https://github.com/ravimody/fridgedoor#set-up")!
+    static let setupGuide = URL(string: "https://fridgedoor.dev/#set-up")!
 
     @Environment(AppModel.self) private var app
     @Environment(\.webAuthenticationSession) private var webAuthenticationSession

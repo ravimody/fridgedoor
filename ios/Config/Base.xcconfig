@@ -12,6 +12,6 @@
 //   Background task    $(FRIDGEDOOR_BUNDLE_PREFIX).refresh
 
 DEVELOPMENT_TEAM =
-FRIDGEDOOR_BUNDLE_PREFIX = app.fridgedoor
+FRIDGEDOOR_BUNDLE_PREFIX = dev.fridgedoor
 
 #include? "Local.xcconfig"

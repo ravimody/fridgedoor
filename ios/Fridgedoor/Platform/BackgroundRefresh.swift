@@ -8,7 +8,7 @@ import Foundation
 enum BackgroundRefresh {
     /// `<bundle id>.refresh`, matching `BGTaskSchedulerPermittedIdentifiers` in Info.plist
     /// (both derive from `FRIDGEDOOR_BUNDLE_PREFIX`, see `Config/Base.xcconfig`).
-    static let identifier = "\(Bundle.main.bundleIdentifier ?? "app.fridgedoor").refresh"
+    static let identifier = "\(Bundle.main.bundleIdentifier ?? "dev.fridgedoor").refresh"
 
     private struct TaskBox: @unchecked Sendable { let task: BGAppRefreshTask }
 

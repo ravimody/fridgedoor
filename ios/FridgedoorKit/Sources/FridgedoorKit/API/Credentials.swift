@@ -30,7 +30,7 @@ public struct KeychainStore: Sendable {
     public let service: String
     public let accessGroup: String?
 
-    public init(service: String = "app.fridgedoor", accessGroup: String? = nil) {
+    public init(service: String = "dev.fridgedoor", accessGroup: String? = nil) {
         self.service = service; self.accessGroup = accessGroup
     }
 

@@ -5,7 +5,7 @@ import WidgetKit
 
 /// Control Center / Lock Screen / Action button: open Groceries ready to type.
 struct AddGroceryControl: ControlWidget {
-    static let kind = "app.fridgedoor.add-grocery"
+    static let kind = "dev.fridgedoor.add-grocery"
 
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: Self.kind) {
@@ -20,7 +20,7 @@ struct AddGroceryControl: ControlWidget {
 
 /// Control Center / Lock Screen / Action button: open To do ready to type.
 struct AddToDoControl: ControlWidget {
-    static let kind = "app.fridgedoor.add-todo"
+    static let kind = "dev.fridgedoor.add-todo"
 
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: Self.kind) {

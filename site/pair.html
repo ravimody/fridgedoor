@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Connect your iPhone · Fridgedoor</title>
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><img src="icon.png" alt=""><a href="/">Fridgedoor</a></header>
+<main>
+  <h1>Connect your iPhone</h1>
+  <p class="lead" id="status">Opening the Fridgedoor app…</p>
+  <div class="actions">
+    <a class="button" id="open" href="#">Open in Fridgedoor</a>
+    <a class="button secondary" href="https://github.com/ravimody/fridgedoor/blob/main/docs/iphone.md">Get the app</a>
+  </div>
+  <p class="note">This link connects the app to your household's own server. The server address and one-time code stay on this device; they're never sent to fridgedoor.dev.</p>
+</main>
+<script>
+  // Pairing details arrive after the "#", which browsers never send to the website.
+  (function () {
+    var params = new URLSearchParams(location.hash.slice(1));
+    var server = params.get('server'), code = params.get('code');
+    var status = document.getElementById('status'), open = document.getElementById('open');
+    if (!server || !code) {
+      status.textContent = 'This pairing link is incomplete. Make a new one in Fridgedoor on the web: Settings → iPhone.';
+      open.hidden = true;
+      return;
+    }
+    var app = 'fridgedoor://pair?server=' + encodeURIComponent(server) + '&code=' + encodeURIComponent(code);
+    open.href = app;
+    status.textContent = 'If the app didn’t open, tap the button. No app yet? Install it first, then open this link again.';
+    location.href = app;
+  })();
+</script>
+</body>
+</html>

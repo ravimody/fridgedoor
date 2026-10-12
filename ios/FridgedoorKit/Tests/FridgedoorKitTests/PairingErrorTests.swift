@@ -8,7 +8,7 @@ import Testing
 
     private func pair(answering status: Int, _ body: String) async throws -> Member {
         let session = StubProtocol.session(routes: ["/native/v1/auth/token": (status, body)])
-        let auth = AuthSession(baseURL: server, keychain: KeychainStore(service: "app.fridgedoor.tests.\(UUID().uuidString)"), urlSession: session)
+        let auth = AuthSession(baseURL: server, keychain: KeychainStore(service: "dev.fridgedoor.tests.\(UUID().uuidString)"), urlSession: session)
         return try await auth.pair(code: "code", deviceLabel: "Test iPhone")
     }
 

@@ -1,5 +1,7 @@
 # Fridgedoor
 
+[fridgedoor.dev](https://fridgedoor.dev)
+
 **The family fridge door, as an app.** Fridgedoor reads the school newsletters, team
 emails, flyers and invitations that pile up in your inbox, and turns them into a calm
 shared plan for your household: what's happening today, what needs a decision, and the

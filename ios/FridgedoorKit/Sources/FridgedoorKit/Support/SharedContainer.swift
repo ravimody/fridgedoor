@@ -24,7 +24,7 @@ public enum SharedContainer {
         public init(id: String, token: String, serverURL: URL) { self.id = id; self.token = token; self.serverURL = serverURL }
     }
 
-    static var sharedKeychain: KeychainStore { KeychainStore(service: "app.fridgedoor.capture", accessGroup: sharedKeychainGroup) }
+    static var sharedKeychain: KeychainStore { KeychainStore(service: "dev.fridgedoor.capture", accessGroup: sharedKeychainGroup) }
 
     public static var captureCredential: CaptureCredential? {
         get { sharedKeychain.value(CaptureCredential.self, for: "share-capture") }
@@ -37,7 +37,7 @@ public enum SharedContainer {
 
     /// Fallback for builds without an App Group (a free personal team can't
     /// provision one): the shared Keychain group still reaches the widget.
-    static var snapshotKeychain: KeychainStore { KeychainStore(service: "app.fridgedoor.widget", accessGroup: sharedKeychainGroup) }
+    static var snapshotKeychain: KeychainStore { KeychainStore(service: "dev.fridgedoor.widget", accessGroup: sharedKeychainGroup) }
 
     public static func writeSnapshot(_ snapshot: WidgetSnapshot?) {
         let data = snapshot.flatMap { try? JSONEncoder().encode($0) }

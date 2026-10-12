@@ -51,7 +51,7 @@ Simulator builds need no signing team.
 ## Signing
 
 `Config/Base.xcconfig` sets an empty `DEVELOPMENT_TEAM` and
-`FRIDGEDOOR_BUNDLE_PREFIX = app.fridgedoor`. To build for a device, use your own:
+`FRIDGEDOOR_BUNDLE_PREFIX = dev.fridgedoor`. To build for a device, use your own:
 
 ```sh
 cp Config/Local.xcconfig.example Config/Local.xcconfig   # gitignored
@@ -84,7 +84,7 @@ only asks for confirmation), or let a DEBUG build sign in headlessly:
 xcrun simctl install <device> build/dd/Build/Products/Debug-iphonesimulator/Fridgedoor.app
 SIMCTL_CHILD_PLANNER_PREVIEW_SERVER=http://127.0.0.1:8899 \
 SIMCTL_CHILD_PLANNER_DEBUG_ROUTE=plans/<id> \
-  xcrun simctl launch --terminate-running-process <device> app.fridgedoor
+  xcrun simctl launch --terminate-running-process <device> dev.fridgedoor
 ```
 
 Use `127.0.0.1`, not `localhost`: the server checks the exact origin.
