@@ -4,6 +4,7 @@
 flowchart LR
   Web[Web app / PWA] -->|session cookie + CSRF| API[Hono API]
   iOS[iPhone app, widgets, Siri, share sheet] -->|bearer tokens /native/v1| API
+  Watch[Apple Watch app] -->|WatchConnectivity, no credential| iOS
   Cal[Any calendar app] -->|webcal token| API
   API --> DB[(SQLite, encrypted fields)]
   Worker[Background worker] --> DB
@@ -20,7 +21,7 @@ flowchart LR
 | `server/` | Hono on Node 22: API, web app hosting and the background worker (one process by default) |
 | `web/` | React 19 + Vite web app served at `/dashboard/`, installable as a PWA |
 | `packages/contracts/` | Zod schemas shared by server and web: the public API shapes |
-| `ios/` | SwiftUI app with widgets and a share extension (MPL-2.0) |
+| `ios/` | SwiftUI app with widgets, a share extension and an Apple Watch app (MPL-2.0) |
 | `deploy/` | Container entrypoint, installer, Caddy/Tailscale configs, cloud-init |
 
 ## Server layout

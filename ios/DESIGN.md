@@ -76,6 +76,15 @@ Copy rules:
   closes), `basket` Groceries, `sparkles` Ask the planner, `mappin.and.ellipse` places,
   `calendar.badge.plus` Add to calendar, `square.and.arrow.up.on.square` Apple Calendar export.
 
+## Apple Watch
+
+- Glanceable and finite: Today (brief, a Decisions row, what's left today) and Decisions.
+  No lists, settings or editing; anything more says "Decide on your iPhone".
+- Decisions are Home's (`WatchPayload`): the same rows and words (Save, Add to calendar,
+  Dismiss with `eye.slash` in a swipe), minus any already decided. Teal marks the
+  Decisions row only.
+- Show what happened at once; if the iPhone can't do it, put the row back and say why.
+
 ## Accessibility
 
 - Every tappable target is at least 44×44pt (`contentShape` + frame).

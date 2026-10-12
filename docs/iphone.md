@@ -4,6 +4,18 @@ The Fridgedoor iPhone app shows today's plan, your lists and decisions, and adds
 home-screen widgets, Siri ("Ask Fridgedoor…", "Ask Planner…"), the share sheet (send a
 flyer, PDF or web page to the planner), and reminders.
 
+## Apple Watch
+
+The iPhone app comes with a watch app. It shows this morning's brief, what's left
+today, and the decisions waiting on you: Save or Add to calendar with one tap, or
+answer the planner's questions by speaking or Scribble. Add the **Today** complication
+to a watch face to see what's next and how many decisions wait.
+
+There's nothing to set up: install the iPhone app, sign in, and the watch app appears
+(or install it from the Watch app on the iPhone). The watch gets everything from the
+iPhone and stores no password, so it needs the iPhone nearby to send a decision.
+Decisions that need more, such as setting a missing time, are made on the iPhone.
+
 ## Connect it to your server
 
 The quickest way: in the web app on a computer, open **Settings → iPhone** and

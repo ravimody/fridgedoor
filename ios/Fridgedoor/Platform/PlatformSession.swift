@@ -56,11 +56,17 @@ struct PlatformData: Sendable {
     var household: [HouseholdPerson] = []
     /// Google connected with a household calendar chosen: widgets may offer "Add to calendar".
     var googleReady = false
+    /// The brief and the planner's questions, for the watch, when the running app has
+    /// loaded them. Nil otherwise: the watch bridge fetches them itself.
+    var daily: DailyView?
+    var clarifications: [Clarification]?
 
     @MainActor init(store: PlannerStore) {
         member = store.member; plans = store.plans; agenda = store.agenda
         todos = store.todos; groceries = store.groceries; reminders = store.reminders
         household = store.household; googleReady = store.googleReady
+        daily = store.dailyOverview
+        clarifications = store.loadedParts.contains(.clarifications) ? store.clarifications : nil
     }
 
     init(member: Member, plans: [PlanSummary], agenda: [AgendaItem], todos: [ListItem], groceries: [ListItem], reminders: [Reminder], household: [HouseholdPerson] = [], googleReady: Bool = false) {

@@ -31,6 +31,8 @@ server through `/native/v1`. No household data lives only on the phone.
 - `Widgets/`: Today, Groceries, To do, Decisions and Quick actions widgets (Home and
   Lock Screen), and the Ask Planner / Add Grocery / Add To-Do controls.
 - `ShareExtension/`: share text, links, photos and PDFs into the planner.
+- `Watch/`: the Apple Watch app (`App/`: brief, today, decisions) and its Today
+  complication (`Widgets/`). It has no credential; see "Apple Watch" below.
 - `DESIGN.md`: vocabulary and UI rules every screen follows. Update it when a rule changes.
 - `scripts/make-icon.swift`: draws the app icon (`swift scripts/make-icon.swift`).
 
@@ -60,7 +62,8 @@ xcodegen generate
 ```
 
 Everything that must be unique per Apple team derives from the prefix: the bundle ids
-(`<prefix>`, `<prefix>.widgets`, `<prefix>.share`), the App Group
+(`<prefix>`, `<prefix>.widgets`, `<prefix>.share`, `<prefix>.watchkitapp`,
+`<prefix>.watchkitapp.widgets`), the App Group
 (`group.<prefix>`), the Keychain groups, the background-task id and the
 `PlannerAppGroup` / `PlannerKeychainGroup` Info.plist keys that code reads at runtime.
 Never hard-code any of them.
@@ -127,7 +130,7 @@ Session tokens are stored per server in the Keychain.
 
 With a free personal team, installs expire after seven days, there is no APNs and no
 TestFlight. If provisioning rejects App Groups, remove
-`com.apple.security.application-groups` from the three targets in `project.yml`: the
+`com.apple.security.application-groups` from the targets in `project.yml`: the
 widget then reads its snapshot through the shared Keychain group. If Keychain sharing
 is also refused, the widget shows a sign-in placeholder and Share asks you to open the
 app; everything else works.
@@ -153,3 +156,26 @@ app; everything else works.
   "What needs me in Fridgedoor", "What's on the Planner grocery list". They require
   an unlocked phone. Private plans are never added to Spotlight, and private titles are
   hidden on the Lock Screen, in widgets while locked, and in reminder alerts.
+
+## Apple Watch
+
+- The watch app (watchOS 26+) is a companion: `WKRunsIndependentlyOfCompanionApp` is
+  false and it ships inside the iPhone app. It never talks to the server and holds no
+  credential.
+- The iPhone sends it a `WatchPayload` (FridgedoorKit) with WatchConnectivity's
+  application context after each sync (`Platform/WatchBridge.swift`, called from
+  `PlatformSync`): the widget snapshot, today's brief, and the decisions Home shows
+  that are still open (the brief's decisions and deadlines, plus open questions).
+  While the server rebuilds the brief it keeps the last ready one. Only changes are
+  resent, or every 15 minutes.
+- The watch sends a `WatchCommand` (Save, Add to calendar, answer or dismiss a
+  question, refresh) with `sendMessage`. The system wakes the iPhone app in the
+  background, which runs it with its own session and replies. The watch hides the
+  row at once and puts it back with the error if the iPhone couldn't do it.
+- The watch saves the payload to its App Group (Keychain fallback) for the Today
+  complication (rectangular, circular, corner, inline). Private titles use
+  `privacySensitive` and read "Busy" in the one-line faces.
+- Simulator: pair an iPhone and a watch simulator (`xcrun simctl pair`), install the
+  iPhone app, then the watch app from `Debug-watchsimulator`. Launch the iPhone app
+  after the watch app is installed, or it won't see it.
+

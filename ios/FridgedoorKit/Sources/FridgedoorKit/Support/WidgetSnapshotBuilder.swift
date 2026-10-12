@@ -112,25 +112,33 @@ public enum WidgetSnapshotBuilder {
 
     /// Suggestions still waiting on a decision (what the Decisions widget and counts show).
     static func openDecisions(_ plans: [PlanSummary]) -> [PlanSummary] {
-        plans.filter { $0.isOpenSuggestion && $0.needsDecision && $0.calendarAction == nil }
+        plans.filter(isWaiting)
+    }
+
+    /// A suggestion nobody has saved, added to the calendar or dismissed yet.
+    static func isWaiting(_ plan: PlanSummary) -> Bool {
+        plan.isOpenSuggestion && plan.needsDecision && plan.calendarAction == nil
     }
 
     /// Suggestions still waiting on a decision, soonest first, with what one tap can do.
     static func decisionRows(_ plans: [PlanSummary], googleReady: Bool, zone: TimeZone, now: Date) -> [WidgetSnapshot.DecisionRow] {
         let open = openDecisions(plans)
         let start = { (plan: PlanSummary) in plan.effectiveFacts.time.flatMap { WidgetSnapshot.sortDate($0, zone: zone) } ?? .distantFuture }
-        return open.sorted { start($0) < start($1) }.prefix(maxDecisions).map { plan in
-            let facts = plan.effectiveFacts
-            let action: WidgetSnapshot.DecisionRow.Action?
-            if plan.canAddToCalendar && googleReady && !plan.isPrivate {
-                action = .calendar
-            } else if facts.time.map({ !$0.isCalendarReady && !$0.isDeadline }) ?? true {
-                action = nil // Needs a date or time: decided in the app ("Set time").
-            } else {
-                action = plan.savedInPlanner == true ? nil : .keep
-            }
-            return .init(id: plan.id, title: facts.title, detail: WidgetSnapshot.label(facts.time, zone: zone, now: now), action: action, isPrivate: plan.isPrivate)
+        return open.sorted { start($0) < start($1) }.prefix(maxDecisions).map { decisionRow($0, googleReady: googleReady, zone: zone, now: now) }
+    }
+
+    /// One suggestion as a row, with what one tap can do (the widget and the watch).
+    static func decisionRow(_ plan: PlanSummary, googleReady: Bool, zone: TimeZone, now: Date) -> WidgetSnapshot.DecisionRow {
+        let facts = plan.effectiveFacts
+        let action: WidgetSnapshot.DecisionRow.Action?
+        if plan.canAddToCalendar && googleReady && !plan.isPrivate {
+            action = .calendar
+        } else if facts.time.map({ !$0.isCalendarReady && !$0.isDeadline }) ?? true {
+            action = nil // Needs a date or time: decided in the app ("Set time").
+        } else {
+            action = plan.savedInPlanner == true ? nil : .keep
         }
+        return .init(id: plan.id, title: facts.title, detail: WidgetSnapshot.label(facts.time, zone: zone, now: now), action: action, isPrivate: plan.isPrivate)
     }
 
     private static func entry(id: String, title: String, time: NormalizedTime, zone: TimeZone, kind: String, link: String, isPrivate: Bool) -> WidgetSnapshot.Entry? {

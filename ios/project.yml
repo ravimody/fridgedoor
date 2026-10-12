@@ -2,6 +2,7 @@ name: Fridgedoor
 options:
   deploymentTarget:
     iOS: "26.0"
+    watchOS: "26.0"
   createIntermediateGroups: true
   developmentLanguage: en
 # DEVELOPMENT_TEAM and FRIDGEDOOR_BUNDLE_PREFIX come from Config/Base.xcconfig,
@@ -30,6 +31,7 @@ targets:
       - package: FridgedoorKit
       - target: FridgedoorWidgets
       - target: FridgedoorShare
+      - target: FridgedoorWatch
     entitlements:
       path: Fridgedoor/Resources/Fridgedoor.entitlements
       properties:
@@ -146,6 +148,64 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(FRIDGEDOOR_BUNDLE_PREFIX).share
         TARGETED_DEVICE_FAMILY: "1"
+  # Apple Watch companion: the daily brief, today's plans and quick decisions. It has
+  # no credential of its own; the iPhone app sends it data and runs what it asks
+  # (Fridgedoor/Platform/WatchBridge.swift).
+  FridgedoorWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - Watch/App
+    dependencies:
+      - package: FridgedoorKit
+      - target: FridgedoorWatchWidgets
+    entitlements:
+      path: Watch/App/FridgedoorWatch.entitlements
+      properties:
+        com.apple.security.application-groups: [group.$(FRIDGEDOOR_BUNDLE_PREFIX)]
+        keychain-access-groups: [$(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared]
+    info:
+      path: Watch/App/Info.plist
+      properties:
+        CFBundleDisplayName: Fridgedoor
+        CFBundleSpokenName: Fridge door
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: $(FRIDGEDOOR_BUNDLE_PREFIX)
+        WKRunsIndependentlyOfCompanionApp: false
+        ITSAppUsesNonExemptEncryption: false
+        PlannerAppGroup: group.$(FRIDGEDOOR_BUNDLE_PREFIX)
+        PlannerKeychainGroup: $(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(FRIDGEDOOR_BUNDLE_PREFIX).watchkitapp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "4"
+  FridgedoorWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - Watch/Widgets
+    dependencies:
+      - package: FridgedoorKit
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    entitlements:
+      path: Watch/Widgets/WatchWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.$(FRIDGEDOOR_BUNDLE_PREFIX)]
+        keychain-access-groups: [$(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared]
+    info:
+      path: Watch/Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: Fridgedoor
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        PlannerAppGroup: group.$(FRIDGEDOOR_BUNDLE_PREFIX)
+        PlannerKeychainGroup: $(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(FRIDGEDOOR_BUNDLE_PREFIX).watchkitapp.widgets
+        TARGETED_DEVICE_FAMILY: "4"
 schemes:
   Fridgedoor:
     build:

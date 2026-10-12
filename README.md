@@ -22,7 +22,8 @@ host) with the AI provider you choose. There is no Fridgedoor company in the mid
 - **Works with any calendar.** Subscribe from Apple, Google or Outlook calendar, or
   connect Google Calendar to add events directly.
 - **Native iPhone app** with widgets, Siri ("Ask Fridgedoor…"), the share sheet and
-  reminders, plus a web app for everything else.
+  reminders, an Apple Watch app for the daily brief and quick decisions, plus a web app
+  for everything else.
 - **Any AI model.** OpenAI, Anthropic Claude, Google Gemini, OpenRouter, Groq,
   Mistral, DeepSeek, xAI, Together, Fireworks, Azure OpenAI, or a local model through
   Ollama, LM Studio, llama.cpp or vLLM. Switch any time in Settings.

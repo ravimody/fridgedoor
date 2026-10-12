@@ -20,6 +20,7 @@ enum PlatformIntegration {
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
         NotificationScheduler.registerCategories()
         BackgroundRefresh.register()
+        WatchBridge.shared.activate()
         backgroundObserver = NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { BackgroundRefresh.schedule() }
         }

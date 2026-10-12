@@ -62,6 +62,7 @@ enum PlatformSync {
         lastSnapshot = nil
         SharedContainer.writeSnapshot(nil)
         WidgetCenter.shared.reloadAllTimelines()
+        WatchBridge.shared.clear()
         SpotlightIndexer.clear()
         PlatformPreferences.shared.resetAccountState()
         // Responses from the old account (or server) must not answer the next one's requests.
@@ -78,6 +79,7 @@ enum PlatformSync {
 
     private static func run(_ data: PlatformData, client: PlannerClient?, fromForeground: Bool) async {
         updateWidget(data)
+        await WatchBridge.shared.update(data, client: client)
         SpotlightIndexer.update(plans: data.plans, todos: data.todos, groceries: data.groceries, timeZone: data.member.timeZone)
         if let client { await refreshDigestStatusIfNeeded(client) }
         await NotificationScheduler.requestProvisionalIfNeeded()

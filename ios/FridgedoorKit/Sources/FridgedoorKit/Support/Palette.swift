@@ -21,7 +21,10 @@ public extension Color {
     static let danger = Color(light: 0xA23B32, dark: 0xF2A39B)
 
     init(light: UInt32, dark: UInt32) {
-        #if canImport(UIKit)
+        #if os(watchOS)
+        // The watch is always dark.
+        self.init(red: Double((dark >> 16) & 0xFF) / 255, green: Double((dark >> 8) & 0xFF) / 255, blue: Double(dark & 0xFF) / 255)
+        #elseif canImport(UIKit)
         self.init(uiColor: UIColor { traits in
             let hex = traits.userInterfaceStyle == .dark ? dark : light
             return UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255, blue: CGFloat(hex & 0xFF) / 255, alpha: 1)

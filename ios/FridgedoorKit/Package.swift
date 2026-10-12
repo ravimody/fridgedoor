@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "FridgedoorKit",
-    platforms: [.iOS(.v26), .macOS(.v26)],
+    platforms: [.iOS(.v26), .watchOS(.v26), .macOS(.v26)],
     products: [.library(name: "FridgedoorKit", targets: ["FridgedoorKit"])],
     targets: [
         .target(name: "FridgedoorKit"),
