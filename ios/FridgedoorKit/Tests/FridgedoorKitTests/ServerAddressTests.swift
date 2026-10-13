@@ -161,6 +161,23 @@ import Testing
         #expect(status.isDegraded)
     }
 
+    @Test func probeAcceptsServerBehindSignInGateway() async throws {
+        let session = StubProtocol.session(routes: [
+            "/healthz": (200, #"{"data":{"status":"ok"}}"#),
+            "/dashboard/api/v1/auth/status": (302, "https://team.cloudflareaccess.com/cdn-cgi/access/login"),
+            "/cdn-cgi/access/login": (200, "<html>Sign in</html>"),
+        ])
+        let status = try await ServerProbe.check(URL(string: "https://gated.example.com")!, using: session)
+        #expect(status == ServerStatus(setupRequired: false, publicURL: nil, isDegraded: false))
+        // A redirect on the same host is not a gateway.
+        let sameHost = StubProtocol.session(routes: [
+            "/healthz": (200, #"{"data":{"status":"ok"}}"#),
+            "/dashboard/api/v1/auth/status": (302, "https://same.example.com/login"),
+            "/login": (200, "<html>Log in</html>"),
+        ])
+        await #expect(throws: PlannerError.notAServer) { try await ServerProbe.check(URL(string: "https://same.example.com")!, using: sameHost) }
+    }
+
     @Test func probeRejectsOtherServers() async {
         let html = StubProtocol.session(routes: ["/healthz": (200, "<html>Welcome to nginx</html>")])
         await #expect(throws: PlannerError.notAServer) { try await ServerProbe.check(URL(string: "https://nginx.example.com")!, using: html) }
@@ -198,6 +215,14 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         guard let url = request.url else { return }
         let id = request.value(forHTTPHeaderField: "X-Stub") ?? ""
         let route = Self.lock.withLock { Self.tables[id]?[url.path()] } ?? (404, #"{"error":{"code":"NOT_FOUND"}}"#)
+        // A 302 route's body is the redirect target.
+        if route.0 == 302, let target = URL(string: route.1) {
+            let redirect = HTTPURLResponse(url: url, statusCode: 302, httpVersion: "HTTP/1.1", headerFields: ["Location": route.1])!
+            var next = URLRequest(url: target)
+            next.setValue(id, forHTTPHeaderField: "X-Stub")
+            client?.urlProtocol(self, wasRedirectedTo: next, redirectResponse: redirect)
+            return
+        }
         let response = HTTPURLResponse(url: url, statusCode: route.0, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(route.1.utf8))

@@ -11,7 +11,8 @@ public struct ServerStatus: Equatable, Sendable {
 }
 
 /// Checks that an address really is a Fridgedoor server, using the two public
-/// endpoints: `GET /healthz` and `GET /dashboard/api/v1/auth/status`.
+/// endpoints: `GET /healthz` and `GET /dashboard/api/v1/auth/status` (which may sit
+/// behind a sign-in gateway).
 public enum ServerProbe {
     private struct Health: Decodable { let status: String }
     private struct AuthStatus: Decodable { let setupRequired: Bool; let publicUrl: String? }
@@ -24,6 +25,12 @@ public enum ServerProbe {
             throw PlannerError.notAServer
         }
         let (statusData, statusResponse) = try await get(server, "dashboard/api/v1/auth/status", using: session)
+        // A sign-in gateway in front of the web app (such as Cloudflare Access) answers with
+        // its own login page on another host. `/healthz` already showed this is Fridgedoor,
+        // and browser sign-in passes through the gateway, so carry on.
+        if let landed = statusResponse.url?.host(), landed != server.host() {
+            return ServerStatus(setupRequired: false, publicURL: nil, isDegraded: health.status != "ok")
+        }
         guard (statusResponse as? HTTPURLResponse)?.statusCode == 200,
               let status = try? PlannerClient.decodeEnvelope(AuthStatus.self, from: statusData) else {
             throw PlannerError.notAServer
