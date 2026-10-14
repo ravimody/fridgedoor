@@ -94,6 +94,9 @@ private struct SettingsRootList: View {
                 }
                 .pickerStyle(.menu)
                 .tint(Color.muted)
+                NavigationLink { AppIconSettingsView() } label: {
+                    SettingsRowLabel(title: "App icon", systemImage: "app")
+                }
                 NavigationLink { PrivacyDisclosureView() } label: {
                     SettingsRowLabel(title: "Privacy", systemImage: "hand.raised")
                 }

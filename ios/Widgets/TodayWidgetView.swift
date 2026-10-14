@@ -52,6 +52,8 @@ struct TodayModel {
 
     var weekday: String { date.formatted(Date.FormatStyle(timeZone: zone).weekday(.wide)) }
     var dayLabel: String { date.formatted(Date.FormatStyle(timeZone: zone).weekday(.abbreviated).month(.abbreviated).day()) }
+    /// "Wed 14": fits the small widget's eyebrow.
+    var shortDay: String { date.formatted(Date.FormatStyle(timeZone: zone).weekday(.abbreviated).day()) }
     var updatedLabel: String { "Updated \(snapshot.generatedAt.formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: zone)))" }
 
     func time(_ entry: WidgetSnapshot.Entry) -> String {
@@ -93,12 +95,13 @@ private struct CountChip: View {
     let count: Int
     let symbol: String
     let label: String
+    var font: Font = .caption.weight(.semibold)
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: symbol).imageScale(.small)
             Text("\(count)").monospacedDigit()
         }
-        .font(.caption.weight(.semibold))
+        .font(font)
         .foregroundStyle(Color.muted)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(count) \(label)")
@@ -174,32 +177,76 @@ private struct AllClear: View {
     }
 }
 
+/// The next thing, then what follows it, packed tight. It reads without any taps, so it
+/// also works in CarPlay and on HomeView, where widget buttons are off.
 struct SmallTodayView: View {
     let model: TodayModel
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            WidgetEyebrow(text: "Today · \(model.dayLabel)")
-            Spacer(minLength: 2)
+        VStack(alignment: .leading, spacing: 3) {
+            // Counts only when there's something to count, and only if the date still fits.
+            ViewThatFits(in: .horizontal) {
+                header(counts: true)
+                header(counts: false)
+            }
             if let next = model.next {
-                Text(model.time(next))
-                    .font(.caption.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(Color.muted)
-                Text(next.title)
-                    .font(.serif(.title3))
-                    .foregroundStyle(Color.ink)
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.85)
-                    .privacySensitive(next.isPrivate == true)
-                if model.remaining.count > 1 {
-                    Text("+\(model.remaining.count - 1) more today").font(.caption).foregroundStyle(Color.muted)
+                let after = model.remaining.filter { $0.id != next.id }
+                // As many of the following items as fit; the rest become "+N more".
+                ViewThatFits(in: .vertical) {
+                    agenda(next, after, showing: 3)
+                    agenda(next, after, showing: 2)
+                    agenda(next, after, showing: 1)
+                    agenda(next, after, showing: 0)
                 }
             } else {
-                AllClear(model: model)
+                AllClear(model: model).padding(.top, 4)
             }
-            Spacer(minLength: 4)
-            Counts(snapshot: model.snapshot)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func header(counts: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            WidgetEyebrow(text: model.shortDay).fixedSize()
+            Spacer(minLength: 0)
+            if counts, model.snapshot.openTodoCount > 0 {
+                CountChip(count: model.snapshot.openTodoCount, symbol: "checklist", label: "open to-dos", font: .caption2.weight(.semibold))
+            }
+            if counts, model.snapshot.openGroceryCount > 0 {
+                CountChip(count: model.snapshot.openGroceryCount, symbol: "basket", label: "groceries", font: .caption2.weight(.semibold))
+            }
+        }
+    }
+
+    private func agenda(_ next: WidgetSnapshot.Entry, _ after: [WidgetSnapshot.Entry], showing limit: Int) -> some View {
+        let shown = after.prefix(limit)
+        return VStack(alignment: .leading, spacing: 3) {
+            Text(model.time(next))
+                .font(.caption2.weight(.semibold).monospacedDigit())
+                .foregroundStyle(Color.muted)
+                .padding(.top, 4)
+            Text(next.title)
+                .font(.serif(.headline))
+                .foregroundStyle(Color.ink)
+                .lineLimit(2)
+                .privacySensitive(next.isPrivate == true)
+            // Title over time, so a long time label doesn't squeeze the title.
+            ForEach(shown) { entry in
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(entry.title)
+                        .font(.caption)
+                        .foregroundStyle(Color.ink)
+                        .lineLimit(1)
+                        .privacySensitive(entry.isPrivate == true)
+                    Text(model.time(entry))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(Color.muted)
+                }
+                .padding(.top, 3)
+            }
+            if after.count > shown.count {
+                Text("+\(after.count - shown.count) more").font(.caption2).foregroundStyle(Color.muted)
+            }
+        }
     }
 }
 

@@ -34,7 +34,9 @@ server through `/native/v1`. No household data lives only on the phone.
 - `Watch/`: the Apple Watch app (`App/`: brief, today, decisions) and its Today
   complication (`Widgets/`). It has no credential; see "Apple Watch" below.
 - `DESIGN.md`: vocabulary and UI rules every screen follows. Update it when a rule changes.
-- `scripts/make-icon.swift`: draws the app icon (`swift scripts/make-icon.swift`).
+- `scripts/make-icon.swift`: draws the app icons (`swift scripts/make-icon.swift`): Big
+  sun (the default `AppIcon`), Rising sun and Full page, each in light, dark and tinted,
+  plus their Settings → App icon previews, the watch icon and `site/icon.png`.
 
 ## Build and test
 
@@ -156,6 +158,13 @@ app; everything else works.
   "What needs me in Fridgedoor", "What's on the Planner grocery list". They require
   an unlocked phone. Private plans are never added to Spotlight, and private titles are
   hidden on the Lock Screen, in widgets while locked, and in reminder alerts.
+- Small widgets also appear in CarPlay and on Apple HomeView, through the paired iPhone,
+  with their buttons turned off. They read the App Group snapshot, which is available
+  after first unlock, so they work while the phone is locked. Quick actions is
+  disfavored there (`disfavoredLocations([.carPlay], …)`); HomeView has no location of
+  its own and no simulator yet.
+- Settings → App icon switches between the icon sets with `setAlternateIconName`
+  (`ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES` in `project.yml`).
 
 ## Apple Watch
 

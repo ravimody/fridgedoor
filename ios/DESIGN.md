@@ -85,6 +85,12 @@ Copy rules:
   Decisions row only.
 - Show what happened at once; if the iPhone can't do it, put the row back and say why.
 
+## Widgets
+
+- Small widgets must read without a tap: CarPlay and HomeView show them with buttons
+  turned off. Fill the space with what's next, not with zero counts or one big title.
+- A widget that is only buttons (Quick actions) is disfavored for `.carPlay`.
+
 ## Accessibility
 
 - Every tappable target is at least 44×44pt (`contentShape` + frame).

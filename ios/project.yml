@@ -82,6 +82,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(FRIDGEDOOR_BUNDLE_PREFIX)
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Settings → App icon offers these (scripts/make-icon.swift draws all three).
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIcon-RisingSun AppIcon-FullPage
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO

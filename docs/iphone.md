@@ -4,6 +4,15 @@ The Fridgedoor iPhone app shows today's plan, your lists and decisions, and adds
 home-screen widgets, Siri ("Ask Fridgedoor…", "Ask Planner…"), the share sheet (send a
 flyer, PDF or web page to the planner), and reminders.
 
+Pick a different app icon in **Settings → App icon**.
+
+## Widgets in the car and the kitchen
+
+The small Today, Decisions, Groceries and To do widgets also show up in CarPlay and on
+Apple's HomeView display, coming from your iPhone. There they're for reading: buttons
+such as checking off a grocery don't work, so do those on the phone. On a shared
+HomeView, each person sees their own widgets only once HomeView recognizes them.
+
 ## Apple Watch
 
 The iPhone app comes with a watch app. It shows this morning's brief, what's left

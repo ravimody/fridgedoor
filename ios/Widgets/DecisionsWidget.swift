@@ -153,6 +153,9 @@ struct QuickActionsWidget: Widget {
         .configurationDisplayName("Quick actions")
         .description("Ask the planner, add a grocery or a to-do, or open today.")
         .supportedFamilies([.systemSmall, .systemMedium])
+        // Every tile is a button that opens the iPhone app: no use in CarPlay or on
+        // HomeView (which follows CarPlay's widget rules), where widget buttons are off.
+        .disfavoredLocations([.carPlay], for: [.systemSmall, .systemMedium])
     }
 }
 
