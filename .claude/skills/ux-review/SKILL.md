@@ -67,26 +67,14 @@ waiting and syncing, errors and offline, signing out and switching server.
 
 ## 3. Grade against the values
 
-Every finding names the value it breaks. The checks:
+Read `VALUES.md`. Each value ends with a question and a **Test**; every finding names
+the value whose test it fails. If `VALUES.md` is missing, or a value has no test, stop
+and tell the owner: the review has nothing to grade against.
 
-1. **Easy first:** a step that needs a terminal, a term of art or reading a doc, for
-   anyone but the person hosting, fails. So does a setting with no sensible default.
-2. **Private, provably:** anything one member sees that another didn't choose to share
-   fails. So does a claim in `docs/privacy.md` or the app's Privacy page that the
-   code doesn't back (check the code, cite it).
-3. **Apple-native:** would a Calendar or Reminders user guess it without reading?
-   System back, sheets for actions, the share sheet, no truncation at the largest
-   text size, every control labeled for VoiceOver.
-4. **One vocabulary:** build a glossary from `ios/DESIGN.md`, iOS strings, web
-   strings, Siri phrases and docs. One thing with two names, or one name for two
-   things, fails.
-5. **Calm:** count notifications, badges and prompts over a simulated first day.
-   Anything that interrupts for something not due today fails.
-6. **Yours to keep:** can each person find how to leave, export or switch servers?
-   Does any copy assume one kind of hosting?
-7. **Honest:** every error says what happened and what to do; nothing says "done"
-   before the server confirmed it (check the code for optimistic success); every doc
-   step matches the current screen.
+How to apply the tests here: for Private, check privacy claims against the code and
+cite it; for One vocabulary, build the glossary from `ios/DESIGN.md`, iOS and web
+strings, Siri phrases and docs; for Calm, simulate a first day and count; for Honest,
+check the code for success shown before the server confirms.
 
 ## 4. Inventory from code, not memory
 
