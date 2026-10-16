@@ -21,6 +21,8 @@ install scripts), `docs/`. Architecture: [docs/architecture.md](docs/architectur
   Typecheck with `pnpm typecheck`, lint with `pnpm lint`.
 - iOS: `cd ios && xcodegen generate`, then build in Xcode; `cd ios/FridgedoorKit && swift test`.
 - Local synthetic data for the iPhone app: `pnpm --filter @fridgedoor/server dev:native`.
+- UX reviews follow [.claude/skills/ux-review/SKILL.md](.claude/skills/ux-review/SKILL.md);
+  their work stays in the gitignored `work/`.
 
 ## Rules
 

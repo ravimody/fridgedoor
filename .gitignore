@@ -14,3 +14,6 @@ ios/**/xcuserdata/
 ios/Config/Local.xcconfig
 ios/build/
 *.local
+
+# Local review work (UX reviews, scratch tests and data)
+work/
