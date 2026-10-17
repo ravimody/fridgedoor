@@ -16,6 +16,8 @@ struct WelcomeView: View {
     @State private var scanned: PairingLink?
     /// Set by the address sheet; browser sign-in starts once its sheet is gone.
     @State private var verifiedServer: URL?
+    /// The benefit icons' column grows with Dynamic Type so large icons don't overlap the text.
+    @ScaledMetric(relativeTo: .title3) private var benefitIconWidth = 32.0
 
     var body: some View {
         // Fits on one screen when it can; scrolls at the largest text sizes.
@@ -53,10 +55,12 @@ struct WelcomeView: View {
             Text("Your household,\nplanned together.")
                 .font(.serif(.largeTitle))
                 .foregroundStyle(Color.ink)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
             Text("Fridgedoor connects to your household's own server, where your plans, lists and calendar live.")
                 .font(.body)
                 .foregroundStyle(Color.muted)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
             VStack(alignment: .leading, spacing: 18) {
                 benefit("envelope.badge", "Plans found in your email, ready to add")
@@ -151,12 +155,13 @@ struct WelcomeView: View {
 
     private func benefit(_ systemImage: String, _ text: String) -> some View {
         Label {
-            Text(text).font(.body).foregroundStyle(Color.ink)
+            // Never truncate: when the lines don't fit, ViewThatFits falls back to scrolling.
+            Text(text).font(.body).foregroundStyle(Color.ink).fixedSize(horizontal: false, vertical: true)
         } icon: {
             Image(systemName: systemImage)
                 .font(.title3)
                 .foregroundStyle(Color.plannerAccent)
-                .frame(width: 32)
+                .frame(width: benefitIconWidth)
                 .accessibilityHidden(true)
         }
     }
