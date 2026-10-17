@@ -16,7 +16,7 @@ const testMessages: Record<string, string> = {
   AI_AUTH_FAILED: 'The provider didn’t accept this key. Check that you copied all of it.',
   AI_MODEL_NOT_FOUND: 'The provider doesn’t have a model with that name. Pick one from the list.',
   AI_RATE_LIMITED: 'The provider says you’ve reached a limit. Check your account’s billing, or wait a minute.',
-  AI_RETRYABLE: 'The provider is busy or couldn’t be reached. Try again in a minute.',
+  AI_RETRYABLE: 'The provider is busy or slow to answer. Try again in a minute.',
   AI_NOT_CONFIGURED: 'Fill in the details above first.',
 };
 const saveMessages: Record<string, string> = {
@@ -40,6 +40,8 @@ export function AiEditor({ autoFocus = false, onSaved, saveLabel = 'Save AI sett
   const [busy, setBusy] = useState<'test' | 'save' | 'remove'>();
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  /** Set after a save was held back because the last test failed; the next save goes through. */
+  const [saveAnyway, setSaveAnyway] = useState(false);
   const providerField = useRef<HTMLSelectElement>(null);
 
   async function load() {
@@ -84,7 +86,7 @@ export function AiEditor({ autoFocus = false, onSaved, saveLabel = 'Save AI sett
 
   async function runTest() {
     if (missingKey()) { setError('Paste your API key first.'); return; }
-    setBusy('test'); setError(''); setNotice(''); setTest(undefined);
+    setBusy('test'); setError(''); setNotice(''); setTest(undefined); setSaveAnyway(false);
     try { setTest((await apiFetch<{ data: AiTestResult }>('/admin/ai/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings!.managedByEnvironment ? { provider: form!.provider, models: {} } : body()) })).data); }
     catch (caught) { setError(errorMessage(caught)); }
     finally { setBusy(undefined); }
@@ -95,10 +97,11 @@ export function AiEditor({ autoFocus = false, onSaved, saveLabel = 'Save AI sett
     if (missingKey()) { setError('Paste your API key first.'); return; }
     if (!form!.main.trim()) { setError('Choose a model for the planner. Test the connection to see the list.'); return; }
     if (form!.separateEmail && !form!.email.trim()) { setError('Choose a model for emails, or untick “Use a separate model for emails”.'); return; }
+    if (test && !test.ok && !saveAnyway) { setError('The last connection test didn’t work, so the planner may not answer. Fix it and test again, or save anyway.'); setSaveAnyway(true); return; }
     setBusy('save'); setError(''); setNotice('');
     try {
       await apiFetch('/admin/ai', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body()) });
-      setNotice(`Saved. The planner now uses ${preset?.label ?? form!.provider}.`);
+      setNotice(`Saved. The planner now uses ${preset?.label ?? form!.provider}.`); setSaveAnyway(false);
       await load().catch(() => undefined);
       onSaved?.();
     } catch (caught) { setError(errorMessage(caught, saveMessages)); }
@@ -116,9 +119,16 @@ export function AiEditor({ autoFocus = false, onSaved, saveLabel = 'Save AI sett
     finally { setBusy(undefined); }
   }
 
+  const address = form.baseUrl.trim() || preset?.baseUrl;
+  // Local servers are usually just not running; a typed address may be wrong; a cloud provider means the server is offline.
+  const unreachable = preset && !preset.needsApiKey && preset.baseUrl && address
+    ? `Nothing answered at ${address}. Check that ${shortLabel(preset.label)} is running and that the Fridgedoor server can reach that computer.`
+    : form.baseUrl.trim() || (preset && showsBaseUrl(preset) && !preset.baseUrl)
+      ? `Nothing answered at ${address ?? 'that address'}. Check the address, and that the AI server is running.`
+      : `Your Fridgedoor server couldn’t reach ${shortLabel(preset?.label ?? 'the provider')}. Check that the server is online, then try again.`;
   const testResult = test && (test.ok
     ? <p role="status" className="notice">{test.model ? `Connected. ${test.model} answered the test.` : `Connected. Found ${test.models.length} ${test.models.length === 1 ? 'model' : 'models'}; choose one below.`}</p>
-    : <p role="alert" className="form-error">{testMessages[test.error ?? ''] ?? 'The test didn’t work. Check the key, address and model, then try again.'}</p>);
+    : <p role="alert" className="form-error">{test.error === 'AI_UNREACHABLE' ? unreachable : testMessages[test.error ?? ''] ?? 'The test didn’t work. Check the key, address and model, then try again.'}</p>);
 
   if (settings.managedByEnvironment) {
     const label = settings.presets.find((candidate) => candidate.id === current?.provider)?.label ?? current?.provider;
@@ -141,7 +151,7 @@ export function AiEditor({ autoFocus = false, onSaved, saveLabel = 'Save AI sett
     {preset?.note && <p className="field-hint">{preset.note}</p>}
     {preset && showsApiKey(preset) && <label>{preset.needsApiKey ? 'API key' : 'API key (if your server needs one)'}<input type="password" autoComplete="off" spellCheck={false} value={form.apiKey} onChange={set('apiKey')} placeholder={keySaved ? 'Saved. Leave blank to keep it.' : ''} /></label>}
     {preset && showsBaseUrl(preset) && <label>Server address<input type="url" inputMode="url" autoComplete="off" spellCheck={false} value={form.baseUrl} onChange={set('baseUrl')} placeholder={preset.baseUrl ?? 'https://example.com/v1'} /></label>}
-    {preset && showsBaseUrl(preset) && preset.baseUrl && <p className="field-hint">Leave blank to use {preset.baseUrl}.</p>}
+    {preset && showsBaseUrl(preset) && preset.baseUrl && <p className="field-hint">{sameComputerHint(preset.label, preset.baseUrl)}</p>}
     <div className="button-row"><button type="button" className="secondary" disabled={Boolean(busy)} onClick={() => void runTest()}>{busy === 'test' ? 'Testing…' : 'Test connection'}</button></div>
     {testResult}
     <label>Model for the planner<input list={`${id}-models`} autoComplete="off" spellCheck={false} value={form.main} onChange={set('main')} aria-describedby={`${id}-main-hint`} /></label>
@@ -152,8 +162,18 @@ export function AiEditor({ autoFocus = false, onSaved, saveLabel = 'Save AI sett
     <FormError message={error} />
     {notice && <p role="status" className="notice">{notice}</p>}
     <div className="button-row">
-      <button type="submit" disabled={Boolean(busy)}>{busy === 'save' ? 'Saving…' : saveLabel}</button>
+      <button type="submit" disabled={Boolean(busy)}>{busy === 'save' ? 'Saving…' : saveAnyway ? 'Save anyway' : saveLabel}</button>
       {allowRemove && current && <button type="button" className="secondary" disabled={Boolean(busy)} onClick={() => void remove()}>Turn off AI</button>}
     </div>
   </form>;
 }
+
+/** `host.docker.internal` is Docker's name for the computer running the container; say that instead. */
+function sameComputerHint(label: string, baseUrl: string) {
+  if (!baseUrl.includes('host.docker.internal')) return `Leave blank to use ${baseUrl}.`;
+  const port = new URL(baseUrl).port;
+  return `Leave blank if ${shortLabel(label)} runs on the same computer as Fridgedoor. If it runs on another computer, enter that computer’s address, such as http://192.168.1.20${port ? `:${port}` : ''}/v1.`;
+}
+
+/** "Ollama (runs on your own computer)" → "Ollama". */
+const shortLabel = (label: string) => label.replace(/ \(.*\)$/, '');
