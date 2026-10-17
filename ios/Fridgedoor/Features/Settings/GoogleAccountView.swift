@@ -157,7 +157,7 @@ struct GoogleAccountView: View {
 
     private func transition(_ action: String) async {
         guard let revision = store.connection?.revision, !busy else { return }
-        let google = isGoogle // Disconnecting clears the provider, so word the message from before.
+        let google = isGoogle // A disconnected connection reads as generic email, so word the message from before.
         busy = true
         defer { busy = false }
         do {
