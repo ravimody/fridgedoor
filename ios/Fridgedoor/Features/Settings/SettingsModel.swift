@@ -185,7 +185,7 @@ func settingsErrorMessage(_ error: Error, fallback: String) -> String {
     guard let error = error as? PlannerError else { return fallback }
     if error.isStale { return "This setting changed on another device. It's been refreshed — check it and try again." }
     switch error.code {
-    case "OFFLINE", "SIGNED_OUT", "UNAUTHENTICATED", "PUSH_UNAVAILABLE", "AI_UNAVAILABLE", "AI_DISABLED", "DISCLOSURE_REQUIRED", "CONSENT_REQUIRED", "UNDO_UNAVAILABLE", "NOT_FOUND":
+    case "OFFLINE", "SERVER_DOWN", "SIGNED_OUT", "UNAUTHENTICATED", "PUSH_UNAVAILABLE", "AI_UNAVAILABLE", "AI_DISABLED", "DISCLOSURE_REQUIRED", "CONSENT_REQUIRED", "UNDO_UNAVAILABLE", "NOT_FOUND":
         return error.userMessage
     case "BACKGROUND_AI_UNAVAILABLE": return "Background AI isn't available on the server."
     default: return fallback

@@ -191,6 +191,14 @@ import Testing
         #expect(PlannerError.connection(URLError(.cannotFindHost)) == .serverUnreachable)
         #expect(PlannerError.connection(URLError(.notConnectedToInternet)) == .offline)
     }
+
+    @Test func tellsServerDownFromOffline() {
+        #expect(PlannerError.transport(URLError(.cannotConnectToHost)) == .serverDown)
+        #expect(PlannerError.transport(URLError(.timedOut)) == .serverDown)
+        #expect(PlannerError.transport(URLError(.notConnectedToInternet)) == .offline)
+        #expect(PlannerError.transport(URLError(.cancelled)) == nil)
+        #expect(PlannerError.serverDown.userMessage.contains("server"))
+    }
 }
 
 /// Serves canned responses by path. Each test gets its own session and routes.

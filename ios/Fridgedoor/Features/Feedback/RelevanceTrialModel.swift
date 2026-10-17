@@ -128,7 +128,7 @@ final class RelevanceTrialModel {
     private func message(_ error: Error, fallback: String) -> String {
         guard let error = error as? PlannerError else { return fallback }
         switch error.code {
-        case "OFFLINE", "SIGNED_OUT": return error.userMessage
+        case "OFFLINE", "SERVER_DOWN", "SIGNED_OUT": return error.userMessage
         case "STALE_REVISION": return "This changed on another device. Pull to refresh and try again."
         case "SUMMARY_UNAVAILABLE": return "Summaries aren't available on the server right now."
         case "SUMMARY_BUSY": return "A summary is already being prepared. Try again in a moment."

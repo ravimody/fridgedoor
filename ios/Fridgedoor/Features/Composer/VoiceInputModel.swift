@@ -200,7 +200,7 @@ final class VoiceInputModel {
             retryClip = audio
             retryAutoSend = autoSend
             let code = (error as? PlannerError)?.code
-            notice = code == "TRANSCRIPTION_LIMIT" || code == "TRANSCRIPTION_UNAVAILABLE" || code == "OFFLINE"
+            notice = code == "TRANSCRIPTION_LIMIT" || code == "TRANSCRIPTION_UNAVAILABLE" || code == "OFFLINE" || code == "SERVER_DOWN"
                 ? (error as? PlannerError)?.assistantMessage
                 : "Couldn't transcribe. Your recording is still here — retry, or type instead."
         }

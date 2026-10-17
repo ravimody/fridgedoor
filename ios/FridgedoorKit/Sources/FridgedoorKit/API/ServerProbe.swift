@@ -59,7 +59,7 @@ public extension PlannerError {
     static let insecureBlocked = PlannerError(code: "INSECURE_CONNECTION_BLOCKED")
     static let certificateProblem = PlannerError(code: "CERTIFICATE_PROBLEM")
 
-    /// Explains why a server address didn't connect, more specifically than `perform`'s "offline".
+    /// Explains why a server address didn't connect, before the phone is signed in to it.
     static func connection(_ error: URLError) -> PlannerError {
         switch error.code {
         case .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff: .offline
