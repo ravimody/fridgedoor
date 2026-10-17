@@ -109,6 +109,7 @@ public struct AssistantSettings: Codable, Hashable, Sendable {
 public struct ConnectionStatus: Codable, Hashable, Sendable {
     public let connected: Bool
     public let status: String // active | paused | needs_reauth | disconnected
+    public let provider: String? // google | imap; older servers omit it and only had Google
     public let email: String?
     public let generation: Int?
     public let revision: Int
@@ -117,7 +118,10 @@ public struct ConnectionStatus: Codable, Hashable, Sendable {
     public let analysisPending: Int?
     public let consentedAt: String?
 
-    enum CodingKeys: String, CodingKey { case connected, status, email, generation, revision, syncLastSuccessAt, syncErrorCode, analysisPending, consentedAt = "consented_at" }
+    /// Google wording (Gmail, Calendar, Google sign-in) applies only to Google connections.
+    public var isGoogle: Bool { provider != "imap" }
+
+    enum CodingKeys: String, CodingKey { case connected, status, provider, email, generation, revision, syncLastSuccessAt, syncErrorCode, analysisPending, consentedAt = "consented_at" }
 }
 
 public struct Destination: Codable, Hashable, Sendable {

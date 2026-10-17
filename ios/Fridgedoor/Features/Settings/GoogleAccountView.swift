@@ -1,8 +1,9 @@
 import FridgedoorKit
 import SwiftUI
 
-/// Google connection status and lifecycle. Consent is browser-only (the server returns
-/// `NATIVE_UNSUPPORTED` to the app), so Connect/Reconnect opens the web Settings page.
+/// Email connection status and lifecycle, for Google or any other mailbox (IMAP). Connecting
+/// is browser-only (the server returns `NATIVE_UNSUPPORTED` to the app), so Connect/Reconnect
+/// opens the web Settings page.
 struct GoogleAccountView: View {
     @Environment(AppModel.self) private var app
     @Environment(PlannerStore.self) private var store
@@ -11,6 +12,9 @@ struct GoogleAccountView: View {
     @State private var busy = false
     @State private var confirmDisconnect = false
     @State private var showDelete = false
+
+    /// Google unless the server says it's another mailbox; nothing connected reads as generic email.
+    private var isGoogle: Bool { store.connection.map { $0.isGoogle && $0.status != "disconnected" } ?? false }
 
     var body: some View {
         List {
@@ -23,7 +27,7 @@ struct GoogleAccountView: View {
             }
             if store.connection?.connected == true {
                 Section {
-                    Button("Disconnect Google", role: .destructive) { confirmDisconnect = true }
+                    Button(isGoogle ? "Disconnect Google" : "Disconnect email", role: .destructive) { confirmDisconnect = true }
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .disabled(busy)
                 }
@@ -34,22 +38,24 @@ struct GoogleAccountView: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .disabled(busy)
             } footer: {
-                Text("Removes your private data on the server and disconnects Google. Shared household plans stay.")
+                Text("Removes your private data on the server and disconnects your email. Shared household plans stay.")
             }
             .plannerRows()
         }
         .plannerList()
         .settingsBottomClearance()
-        .navigationTitle("Google account")
+        .navigationTitle("Email")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await store.refresh([.connection, .destination]) }
         .fullScreenCover(item: $browser, onDismiss: returnedFromBrowser) { link in
             SafariView(url: link.url).ignoresSafeArea()
         }
-        .confirmationDialog("Disconnect Google?", isPresented: $confirmDisconnect, titleVisibility: .visible) {
+        .confirmationDialog(isGoogle ? "Disconnect Google?" : "Disconnect email?", isPresented: $confirmDisconnect, titleVisibility: .visible) {
             Button("Disconnect", role: .destructive) { Task { await transition("disconnect") } }
         } message: {
-            Text("Gmail and Calendar sync stop and Fridgedoor asks Google to revoke its access. Saved plans stay. You can connect again later.")
+            Text(isGoogle
+                ? "Gmail and Calendar sync stop and Fridgedoor asks Google to revoke its access. Saved plans stay. You can connect again later."
+                : "The planner stops reading this mailbox. Saved plans stay. You can connect again later.")
         }
         .sheet(isPresented: $showDelete) { DeletePrivateDataSheet().environment(model) }
     }
@@ -87,7 +93,7 @@ struct GoogleAccountView: View {
                 Button("Pause sync", systemImage: "pause.circle") { Task { await transition("pause") } }
                     .disabled(busy)
             } footer: {
-                Text("Stops Gmail and Calendar sync until you resume, and cancels email waiting to be read.")
+                Text(isGoogle ? "Stops Gmail and Calendar sync until you resume, and cancels email waiting to be read." : "Stops email sync until you resume, and cancels email waiting to be read.")
             }
             .plannerRows()
         case "paused":
@@ -103,16 +109,16 @@ struct GoogleAccountView: View {
                 Button {
                     browser = BrowserLink(url: store.client.webURL("settings/email"))
                 } label: {
-                    Label(connection.status == "needs_reauth" ? "Reconnect Google in Safari" : "Connect Google in Safari", systemImage: "safari")
+                    Label(connection.status == "needs_reauth" ? "Reconnect in Safari" : "Connect email in Safari", systemImage: "safari")
                 }
             } footer: {
-                Text("Google sign-in only works in a browser. Finish there, then tap Done to come back.")
+                Text("Connecting email happens in a browser. Finish there, then tap Done to come back.")
             }
             .plannerRows()
             Section("What connecting shares") {
                 SettingsSummary(points: [
-                    .init("envelope", "The planner can read Gmail to find household plans."),
-                    .init("calendar", "It reads the calendars you choose and can add events you approve."),
+                    .init("envelope", "The planner can read your email to find household plans."),
+                    .init("calendar", "With Google, it also reads the calendars you choose and can add events you approve."),
                     .init("line.3.horizontal.decrease", "Senders and labels you skip are filtered out where possible."),
                 ], details: [Self.consentDetail])
             }
@@ -122,27 +128,27 @@ struct GoogleAccountView: View {
             Section {
                 Button("Reconnect in Safari", systemImage: "safari") { browser = BrowserLink(url: store.client.webURL("settings/email")) }
             } footer: {
-                Text("Use this if Google asks you to approve access again.")
+                Text(isGoogle ? "Use this if Google asks you to approve access again." : "Use this if your mailbox password changed.")
             }
             .plannerRows()
         }
     }
 
     /// The full description of Google access, shown under "Read more".
-    private static let consentDetail = "Google consent requests read-only Gmail access plus Calendar list and event access. The planner scans Gmail message metadata and bodies to find possible household plans; exclusions reduce processing and sharing but can't promise that an excluded work message is never read. Calendar sync starts with no calendars selected."
+    private static let consentDetail = "With Google, consent requests read-only Gmail access plus Calendar list and event access. The planner scans Gmail message metadata and bodies to find possible household plans; exclusions reduce processing and sharing but can't promise that an excluded work message is never read. Calendar sync starts with no calendars selected."
 
     private func statusSentence(_ connection: ConnectionStatus) -> String {
         switch connection.status {
         case "active": "Connected · syncing"
         case "paused": "Connected · sync paused"
-        case "needs_reauth": "Google needs you to reconnect"
+        case "needs_reauth": isGoogle ? "Google needs you to reconnect" : "Your mailbox needs you to sign in again"
         default: "Connect to find plans in email and calendars"
         }
     }
 
     private func syncErrorText(_ code: String) -> String {
         switch code {
-        case "reconnect", "needs_reauth", "GOOGLE_REAUTH_REQUIRED": "Google needs you to reconnect before sync can continue."
+        case "reconnect", "needs_reauth", "GOOGLE_REAUTH_REQUIRED": isGoogle ? "Google needs you to reconnect before sync can continue." : "Your mailbox needs you to sign in again before sync can continue."
         default: "The last email sync had a problem. It retries automatically."
         }
     }
@@ -151,6 +157,7 @@ struct GoogleAccountView: View {
 
     private func transition(_ action: String) async {
         guard let revision = store.connection?.revision, !busy else { return }
+        let google = isGoogle // Disconnecting clears the provider, so word the message from before.
         busy = true
         defer { busy = false }
         do {
@@ -158,7 +165,7 @@ struct GoogleAccountView: View {
             store.connection = next
             await store.refresh([.connection, .destination])
             await model.load([.calendars, .backgroundAi])
-            app.show(action == "disconnect" ? "Google disconnected." : action == "pause" ? "Sync paused." : "Sync resumed.")
+            app.show(action == "disconnect" ? (google ? "Google disconnected." : "Email disconnected.") : action == "pause" ? "Sync paused." : "Sync resumed.")
         } catch {
             app.show(settingsErrorMessage(error, fallback: "The connection couldn't be changed. Try again."), isError: true)
             await store.refresh([.connection])
@@ -171,7 +178,7 @@ struct GoogleAccountView: View {
             await store.refresh([.connection, .destination])
             await model.load([.calendars, .backgroundAi, .policy])
             if before != "active", store.connection?.status == "active" {
-                app.show("Google connected. Choose calendars to begin sync.")
+                app.show(isGoogle ? "Google connected. Choose calendars to begin sync." : "Email connected.")
             }
         }
     }
@@ -240,7 +247,7 @@ private struct DeletePrivateDataSheet: View {
     }
 
     private static let removed = [
-        "Google connection, email sources and calendar choices",
+        "Email connection, email sources and calendar choices",
         "Private plans, drafts and requests",
         "Household facts and their history",
         "Shortcut credentials and pending captures",

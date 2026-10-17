@@ -50,12 +50,12 @@ private struct SettingsRootList: View {
 
             Section("Household") {
                 NavigationLink { GoogleAccountView().environment(model) } label: {
-                    SettingsRowLabel(title: "Google account", systemImage: "envelope", value: connectionValue, valueTone: GoogleStatus(store.connection?.status).tone)
+                    SettingsRowLabel(title: "Email", systemImage: "envelope", value: connectionValue, valueTone: GoogleStatus(store.connection?.status).tone)
                 }
                 NavigationLink { CalendarSettingsView().environment(model) } label: {
                     SettingsRowLabel(title: "Calendars", systemImage: "calendar", value: calendarValue)
                 }
-                .disabled(store.connection == nil)
+                .disabled(store.connection == nil || otherMailbox)
             }
             .plannerRows()
 
@@ -176,9 +176,16 @@ private struct SettingsRootList: View {
         return GoogleStatus(connection.status).label
     }
 
+    /// Calendars come from Google; a connected iCloud or other IMAP mailbox has none to read.
+    private var otherMailbox: Bool {
+        guard let connection = store.connection else { return false }
+        return !connection.isGoogle && connection.status != "disconnected"
+    }
+
     /// "Household + 1": the destination (or first) calendar read, plus how many more.
     private var calendarValue: String? {
         guard let connection = store.connection else { return nil }
+        guard !otherMailbox else { return "Google only" }
         guard connection.status == "active" else { return "Connect first" }
         guard model.loaded.contains(.calendars) else { return nil }
         let selected = model.savedCalendars.filter(\.selected)
@@ -206,7 +213,7 @@ private struct SettingsRootList: View {
     }
 }
 
-/// Google connection states as the person should read them.
+/// Email connection states as the person should read them.
 struct GoogleStatus {
     let raw: String?
     init(_ raw: String?) { self.raw = raw }
