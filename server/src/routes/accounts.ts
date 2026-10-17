@@ -30,7 +30,7 @@ const failure = (c: C, error: unknown) => {
   const code = error instanceof Error ? error.message : '';
   if (code === 'FORBIDDEN') return fail(c, 403, code);
   if (code === 'NOT_FOUND' || code === 'INVITE_INVALID') return fail(c, 404, code);
-  if (['EMAIL_IN_USE', 'SETUP_ALREADY_DONE', 'CANNOT_REMOVE_SELF', 'ALREADY_MEMBER'].includes(code)) return fail(c, 409, code);
+  if (['EMAIL_IN_USE', 'SETUP_ALREADY_DONE', 'CANNOT_REMOVE_SELF', 'ALREADY_MEMBER', 'MEMBER_REMOVED'].includes(code)) return fail(c, 409, code);
   if (code === 'PASSWORD_INCORRECT') return fail(c, 403, code);
   throw error;
 };
