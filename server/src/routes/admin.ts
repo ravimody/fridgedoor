@@ -6,6 +6,7 @@ import type { AccountService } from '../auth/accounts.js';
 import type { AppConfig } from '../config.js';
 import { createProvider, type AiConfig } from '../llm/hub.js';
 import { PROVIDER_PRESETS, presetFor } from '../llm/presets.js';
+import { UNREACHABLE } from '../llm/http.js';
 import { isLlmErrorCode } from '../llm/types.js';
 import { aiFromEnv, aiSettingsSchema, googleSettingsSchema, resolveAiConfig, type SettingsStore } from '../settings.js';
 
@@ -73,7 +74,7 @@ export function registerAdminRoutes(app: Hono<{ Variables: Variables }>, deps: D
     let provider;
     try { provider = createProvider(config, deps.fetch); } catch { return c.json({ data: { ok: false, error: 'AI_NOT_CONFIGURED', models: [] } }); }
     const signal = AbortSignal.timeout(45_000);
-    const code = (error: unknown) => error instanceof Error && isLlmErrorCode(error.message) ? error.message : 'AI_PROVIDER_FAILED';
+    const code = (error: unknown) => error instanceof Error && error.cause === UNREACHABLE ? 'AI_UNREACHABLE' : error instanceof Error && isLlmErrorCode(error.message) ? error.message : 'AI_PROVIDER_FAILED';
     let models: string[] = [];
     let listError: string | undefined;
     if (provider.listModels) { try { models = await provider.listModels(signal); } catch (error) { listError = code(error); } }

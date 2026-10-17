@@ -62,4 +62,11 @@ describe('AI settings', () => {
     expect(await result.json()).toMatchObject({ data: { ok: true, models: ['llama3.3', 'qwen3'], model: 'llama3.3' } });
     expect(requests).toEqual(['http://host.docker.internal:11434/v1/models', 'http://host.docker.internal:11434/v1/chat/completions']);
   });
+
+  it('reports that nothing answered when the AI server is down', async () => {
+    const refused = (async () => { throw new TypeError('fetch failed'); }) as unknown as typeof fetch;
+    const { app, headers } = await signedIn({}, refused);
+    const result = await app.request('/dashboard/api/v1/admin/ai/test', { method: 'POST', headers, body: JSON.stringify({ provider: 'ollama', models: { main: 'llama3.3' } }) });
+    expect(await result.json()).toMatchObject({ data: { ok: false, error: 'AI_UNREACHABLE' } });
+  });
 });

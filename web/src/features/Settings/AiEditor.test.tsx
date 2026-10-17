@@ -83,6 +83,29 @@ it('explains a failed test in plain language', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('didn’t accept this key');
 });
 
+it('says nothing answered when a local AI server isn’t running, and holds back the first save', async () => {
+  mockServer({ ...saved, current: null }, { ok: false, models: [], error: 'AI_UNREACHABLE' } as never);
+  render(<AiEditor />);
+  fireEvent.change(await screen.findByLabelText('AI provider'), { target: { value: 'ollama' } });
+  expect(screen.getByText(/runs on the same computer as Fridgedoor/)).toHaveTextContent('http://192.168.1.20:11434/v1');
+  fireEvent.change(screen.getByLabelText('Model for the planner'), { target: { value: 'llama3.3' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Test connection' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Nothing answered at http://host.docker.internal:11434/v1. Check that Ollama is running');
+  fireEvent.click(screen.getByRole('button', { name: 'Save AI settings' }));
+  expect(await screen.findByText(/last connection test didn’t work/)).toBeVisible();
+  expect(calls('PUT', '/admin/ai')).toHaveLength(0);
+  fireEvent.click(screen.getByRole('button', { name: 'Save anyway' }));
+  await waitFor(() => expect(calls('PUT', '/admin/ai')).toHaveLength(1));
+  expect(await screen.findByRole('button', { name: 'Save AI settings' })).toBeVisible();
+});
+
+it('names the provider when a cloud provider can’t be reached', async () => {
+  mockServer(saved, { ok: false, models: [], error: 'AI_UNREACHABLE' } as never);
+  render(<AiEditor />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Test connection' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('couldn’t reach Anthropic. Check that the server is online');
+});
+
 it('is read-only when the server configuration sets AI', async () => {
   mockServer({ ...saved, managedByEnvironment: true });
   render(<AiEditor />);
