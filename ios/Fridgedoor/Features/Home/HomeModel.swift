@@ -204,7 +204,7 @@ struct HomeSnapshot {
         let folded = open.filter { !Set($0.sourceRefs ?? []).isDisjoint(with: timeRefs) }
         let foldedIds = Set(folded.map(\.id))
         answeredByDecision = foldedIds
-        clarifications = open.filter { !foldedIds.contains($0.id) }
+        clarifications = open.filter { !foldedIds.contains($0.id) && !store.foldedClarifications.contains($0.id) }
         pendingRequests = store.runsNeedingReview
     }
 

@@ -6,13 +6,12 @@ import SwiftUI
 /// queue is empty it says so in one line instead of showing a section.
 struct DecisionsSection: View {
     let snapshot: HomeSnapshot
-    @Environment(HomeState.self) private var home
     @State private var expanded = false
 
     private static let collapsedCount = 3
 
     private var rows: [DecisionItem] {
-        snapshot.attention.map(DecisionItem.review) + snapshot.clarifications.filter { !home.foldedClarifications.contains($0.id) }.map(DecisionItem.question) + snapshot.pendingRequests.map(DecisionItem.request)
+        snapshot.attention.map(DecisionItem.review) + snapshot.clarifications.map(DecisionItem.question) + snapshot.pendingRequests.map(DecisionItem.request)
     }
 
     var body: some View {

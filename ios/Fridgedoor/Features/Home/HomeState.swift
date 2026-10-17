@@ -20,9 +20,6 @@ final class HomeState {
     var calendarDraft: CalendarDraft?
     var datePickerTask: ListItem?
     var refreshingReview = false
-    /// Questions folded into a plan's "Set time" row this session. They stay hidden after the
-    /// time is set, until the server closes them, instead of briefly reappearing.
-    var foldedClarifications: Set<String> = []
     // Haptic triggers.
     var completedCount = 0
     var dismissedCount = 0
