@@ -111,7 +111,9 @@ export class AccountService {
     return this.db.transaction(() => {
       const invite = this.openInvite(token);
       if (!invite) throw new Error('INVITE_INVALID');
-      if (accessSubject && this.db.prepare('SELECT 1 FROM members WHERE access_subject = ?').get(accessSubject)) throw new Error('ALREADY_MEMBER');
+      // A removed member keeps their row; the owner restores them rather than creating a second one.
+      const existing = accessSubject ? this.db.prepare('SELECT active FROM members WHERE access_subject = ?').get(accessSubject) as { active: number } | undefined : undefined;
+      if (existing) throw new Error(existing.active ? 'ALREADY_MEMBER' : 'MEMBER_REMOVED');
       const member = this.insertMember(invite.householdId, parsed, passwordHash, 'member', accessSubject);
       this.db.prepare('UPDATE household_invites SET used_at = ?, used_by = ? WHERE id = ?').run(this.clock().toISOString(), member.id, invite.id);
       return member;

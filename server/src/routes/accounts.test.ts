@@ -105,7 +105,11 @@ describe('sign-in, invites and pairing', () => {
     expect((await bootstrap('sam')).status).toBe(200);
     const again = await app.request('/dashboard/api/v1/household/invites', { method: 'POST', headers: { Authorization: 'Bearer alex', Cookie: cookieOf(alex), 'X-CSRF-Token': csrf, ...origin } });
     const second = (await again.json() as { data: { url: string } }).data.url.split('/').pop()!;
-    expect((await app.request(`/dashboard/api/v1/auth/invites/${second}`, json({ ...profile, email: 'sam2@example.test' }, { ...origin, Authorization: 'Bearer sam' }))).status).toBe(409);
+    const repeat = await app.request(`/dashboard/api/v1/auth/invites/${second}`, json({ ...profile, email: 'sam2@example.test' }, { ...origin, Authorization: 'Bearer sam' }));
+    expect(repeat.status).toBe(409); expect((await repeat.json() as { error: { code: string } }).error.code).toBe('ALREADY_MEMBER');
+    db.prepare("UPDATE members SET active = 0 WHERE access_subject = 'subject-sam'").run();
+    const removed = await app.request(`/dashboard/api/v1/auth/invites/${second}`, json({ ...profile, email: 'sam2@example.test' }, { ...origin, Authorization: 'Bearer sam' }));
+    expect((await removed.json() as { error: { code: string } }).error.code).toBe('MEMBER_REMOVED');
   });
 
   it('removing a member ends their sessions', async () => {
