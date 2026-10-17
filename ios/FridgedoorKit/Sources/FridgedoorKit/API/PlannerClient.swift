@@ -11,10 +11,21 @@ public struct PlannerError: Error, LocalizedError, Equatable, Sendable {
 
     public static let signedOut = PlannerError(code: "SIGNED_OUT", status: 401)
     public static let offline = PlannerError(code: "OFFLINE")
+    public static let serverDown = PlannerError(code: "SERVER_DOWN")
     public static let decoding = PlannerError(code: "UNEXPECTED_RESPONSE")
     public static let pairingCodeInvalid = PlannerError(code: "PAIRING_CODE_INVALID", status: 401)
     public static let pairingCodeUsed = PlannerError(code: "PAIRING_CODE_USED", status: 401)
     public static let pairingCodeExpired = PlannerError(code: "PAIRING_CODE_EXPIRED", status: 401)
+
+    /// A request that never got an answer: the phone's own connection is down (offline), or the
+    /// phone is online but the server didn't answer (server down). Nil for other URL errors.
+    static func transport(_ error: URLError) -> PlannerError? {
+        switch error.code {
+        case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff: .offline
+        case .timedOut, .cannotConnectToHost, .cannotFindHost: .serverDown
+        default: nil
+        }
+    }
 
     public var isStale: Bool { code == "STALE_REVISION" || code == "STALE_CLIENT" || status == 409 }
 
@@ -25,6 +36,7 @@ public struct PlannerError: Error, LocalizedError, Equatable, Sendable {
         switch code {
         case "SIGNED_OUT", "UNAUTHENTICATED", "NATIVE_GRANT_INVALID": "Your session ended. Sign in again to continue."
         case "OFFLINE": "You're offline. Check your connection and try again."
+        case "SERVER_DOWN": "Can't reach the Fridgedoor server. It may be down, or only reachable at home or over a VPN. Try again in a minute."
         case "PAIRING_CODE_USED": "This code was already used. Make a new one in Settings → iPhone on the web."
         case "PAIRING_CODE_EXPIRED": "This code expired. Codes last 10 minutes; make a new one."
         case "PAIRING_CODE_INVALID": "That pairing code has expired or was already used. Make a new one in Fridgedoor on the web (Settings → iPhone) and scan it again."
@@ -304,7 +316,7 @@ public final class PlannerClient: Sendable {
 
     static func perform(_ request: URLRequest, using session: URLSession) async throws -> (Data, URLResponse) {
         do { return try await session.data(for: request) }
-        catch let error as URLError where [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotConnectToHost, .cannotFindHost, .dataNotAllowed].contains(error.code) { throw PlannerError.offline }
+        catch let error as URLError { throw PlannerError.transport(error) ?? error }
     }
 
     static func check(data: Data, response: URLResponse) throws {
