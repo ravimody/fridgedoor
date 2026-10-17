@@ -141,7 +141,11 @@ export function AiEditor({ autoFocus = false, onSaved, saveLabel = 'Save AI sett
   }
 
   const modelOptions = [...new Set([...(test?.models ?? []), preset?.suggested.main, preset?.suggested.email, current && sameProvider ? current.models.main : undefined].filter((value): value is string => Boolean(value)))];
-  const set = (field: 'apiKey' | 'baseUrl' | 'main' | 'email') => (event: { target: { value: string } }) => setForm({ ...form, [field]: event.target.value });
+  // A failed test no longer describes the form once it changes: drop it, and the save hold with it.
+  const set = (field: 'apiKey' | 'baseUrl' | 'main' | 'email') => (event: { target: { value: string } }) => {
+    setForm({ ...form, [field]: event.target.value });
+    if (test && !test.ok) { setTest(undefined); setSaveAnyway(false); setError(''); }
+  };
   return <form className="ai-editor" onSubmit={(event) => void save(event)} noValidate>
     <p>The planner uses an AI service to read the emails, messages, photos and PDFs you send it, and to turn them into plans and answers. {preset && !preset.needsApiKey
       ? 'They’re sent to the AI server at the address below, which can be a computer you run yourself.'

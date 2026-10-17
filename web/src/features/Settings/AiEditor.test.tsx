@@ -99,6 +99,19 @@ it('says nothing answered when a local AI server isn’t running, and holds back
   expect(await screen.findByRole('button', { name: 'Save AI settings' })).toBeVisible();
 });
 
+it('drops a failed test once the details change', async () => {
+  mockServer({ ...saved, current: null }, { ok: false, models: [], error: 'AI_UNREACHABLE' } as never);
+  render(<AiEditor />);
+  fireEvent.change(await screen.findByLabelText('AI provider'), { target: { value: 'ollama' } });
+  fireEvent.change(screen.getByLabelText('Model for the planner'), { target: { value: 'llama3.3' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Test connection' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Nothing answered');
+  fireEvent.change(screen.getByLabelText('Server address'), { target: { value: 'http://192.168.1.20:11434/v1' } });
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Save AI settings' }));
+  await waitFor(() => expect(calls('PUT', '/admin/ai')).toHaveLength(1));
+});
+
 it('names the provider when a cloud provider can’t be reached', async () => {
   mockServer(saved, { ok: false, models: [], error: 'AI_UNREACHABLE' } as never);
   render(<AiEditor />);
