@@ -1,15 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PhonePairing } from '@fridgedoor/contracts';
 import { apiFetch } from '../../api/client.js';
 import { errorMessage, FormError } from '../Auth/forms.js';
 
 /** Shows a short-lived QR code (made by the server) that signs the Fridgedoor iPhone app in to this account. */
-export function PairPhone({ autoStart = false }: { autoStart?: boolean }) {
+export function PairPhone() {
   const [pairing, setPairing] = useState<PhonePairing>();
   const [expired, setExpired] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const started = useRef(false);
 
   async function create() {
     setBusy(true); setError('');
@@ -17,7 +16,6 @@ export function PairPhone({ autoStart = false }: { autoStart?: boolean }) {
     catch (caught) { setError(errorMessage(caught)); }
     finally { setBusy(false); }
   }
-  useEffect(() => { if (autoStart && !started.current) { started.current = true; void create(); } }, [autoStart]);
   useEffect(() => {
     if (!pairing) return;
     const timer = window.setTimeout(() => setExpired(true), Math.max(0, Date.parse(pairing.expiresAt) - Date.now()));
