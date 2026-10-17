@@ -82,7 +82,7 @@ it('creates the household, then walks through the optional steps to Home', async
   expect(screen.getByRole('link', { name: 'Open in the Fridgedoor app' })).toHaveAttribute('href', 'fridgedoor://pair?server=x&code=y');
   fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
   expect(await screen.findByText('Home screen')).toBeVisible();
-}, 15_000); // The whole wizard in one test; slow CI runners need more than the default 5 s.
+});
 
 it('explains where to find the setup link when it is missing', () => {
   renderAt('/setup');
