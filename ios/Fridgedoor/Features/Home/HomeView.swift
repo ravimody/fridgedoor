@@ -42,7 +42,7 @@ private struct HomeContent: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                HomeHeader(member: store.member, now: now, decisionCount: todaySnapshot.decisionCount - todaySnapshot.clarifications.filter { home.foldedClarifications.contains($0.id) }.count,
+                HomeHeader(member: store.member, now: now, decisionCount: todaySnapshot.decisionCount,
                            scheduleCount: todayScheduleCount, nextUp: todaySnapshot.nextUp(after: now, zone: store.timeZone),
                            isLoaded: store.hasLoaded)
                     .padding(.top, 4)
@@ -106,7 +106,7 @@ private struct HomeContent: View {
         .sheet(item: $home.datePickerTask) { task in
             SnoozeDateSheet(task: task, zone: store.timeZone) { date in home.snooze(task, to: date) }
         }
-        .onChange(of: todaySnapshot.answeredByDecision, initial: true) { _, folded in home.foldedClarifications.formUnion(folded) }
+        .onChange(of: todaySnapshot.answeredByDecision, initial: true) { _, folded in store.foldedClarifications.formUnion(folded) }
         .sensoryFeedback(.success, trigger: home.completedCount)
         .sensoryFeedback(.impact(weight: .medium), trigger: home.dismissedCount)
         .task {

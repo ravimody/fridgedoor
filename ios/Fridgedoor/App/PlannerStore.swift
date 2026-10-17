@@ -31,6 +31,10 @@ final class PlannerStore {
     var dailyOverview: DailyView?
     var dailySettings: DailySettings?
     var clarifications: [Clarification] = []
+    /// Questions folded into a plan's "Set time" row this session. They stay hidden after the
+    /// time is set, until the server closes them, instead of briefly reappearing. Shared so the
+    /// tab badge and Home's header count the same things.
+    var foldedClarifications: Set<String> = []
 
     private(set) var hasLoaded = false
     /// Parts that have loaded successfully at least once this session.

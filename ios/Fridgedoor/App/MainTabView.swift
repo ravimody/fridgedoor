@@ -40,7 +40,7 @@ struct MainTabView: View {
         .onAppear { store.startPolling() }
     }
 
-    /// Same count as Home's "N need you" line.
+    /// Same count as Home's "N decisions" line: both read HomeSnapshot, which hides folded questions.
     private var attentionBadge: Int {
         HomeSnapshot(store: store, selectedDay: nil, now: .now).decisionCount
     }
