@@ -45,6 +45,9 @@ import Testing
         #expect(status.revision == 2)
         let disconnected = try decode(ConnectionStatus.self, #"{"data":{"connected":false,"status":"disconnected","generation":0,"revision":0,"syncLastSuccessAt":null,"syncErrorCode":null,"analysisPending":0}}"#)
         #expect(disconnected.email == nil)
+        #expect(status.isGoogle)
+        let mailbox = try decode(ConnectionStatus.self, #"{"data":{"connected":true,"provider":"imap","email":"sam@example.org","status":"active","generation":1,"revision":1,"syncLastSuccessAt":null,"syncErrorCode":null,"analysisPending":0}}"#)
+        #expect(!mailbox.isGoogle)
     }
 
     @Test func decodesSettingsStatuses() throws {
