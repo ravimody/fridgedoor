@@ -1,13 +1,13 @@
-import { useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Member } from '@fridgedoor/contracts';
-import { startSession } from '../../api/client.js';
+import { fetchAuthStatus, startSession } from '../../api/client.js';
 import { AiEditor } from '../Settings/AiEditor.js';
 import { CalendarFeed } from '../Settings/CalendarFeed.js';
 import { EmailSettings } from '../Settings/EmailSettings.js';
 import { InviteLink } from '../Settings/InviteLink.js';
 import { PairPhone } from '../Settings/PairPhone.js';
-import { AuthPage, emptyProfile, errorMessage, FormError, profileBody, ProfileFields, profileProblem, useFocusFirst } from './forms.js';
+import { AddToHomeScreen, AuthPage, emptyProfile, errorMessage, FormError, profileBody, ProfileFields, profileProblem, useFocusFirst } from './forms.js';
 
 const STEPS = ['household', 'ai', 'email', 'calendar', 'invite', 'phone'] as const;
 type Step = (typeof STEPS)[number];
@@ -42,9 +42,22 @@ export function SetupWizard({ member, setupRequired, onSignedIn }: { member?: Me
   </WizardStep>;
   if (step === 'calendar') return <CalendarStep onNext={next} />;
   if (step === 'invite') return <InviteStep onNext={next} />;
-  return <WizardStep step={step} title="Connect your iPhone" onNext={next} nextLabel="Finish">
-    <p>The Fridgedoor app keeps your plans and lists on your phone and lets you share things to the planner from any app. You can skip this and do it later from Settings → iPhone.</p>
-    <PairPhone autoStart />
+  return <PhoneStep onNext={next} />;
+}
+
+/** The last step: the web app on everyone's phone; pairing only for whoever built the iPhone app. */
+function PhoneStep({ onNext }: { onNext: () => void }) {
+  // The public address, the same one invite links use; this browser may be on a local one.
+  const [origin, setOrigin] = useState(window.location.origin);
+  useEffect(() => { fetchAuthStatus().then((status) => setOrigin(status.publicUrl)).catch(() => undefined); }, []);
+  return <WizardStep step="phone" title="Put Fridgedoor on your phone" onNext={onNext} nextLabel="Finish">
+    <p>You and everyone you invite use Fridgedoor in the phone’s browser. Open <strong>{`${origin.replace(/\/$/, '')}/dashboard/`}</strong> on the phone, sign in, then save it like an app:</p>
+    <AddToHomeScreen />
+    <details className="card">
+      <summary>Built the iPhone app yourself?</summary>
+      <p>Until the Fridgedoor app is in the App Store, it’s installed with Xcode on a Mac, so it’s for whoever builds it. Connect it here, or later from Settings → iPhone.</p>
+      <PairPhone />
+    </details>
   </WizardStep>;
 }
 

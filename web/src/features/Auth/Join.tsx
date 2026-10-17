@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { inviteInfoSchema, type InviteInfo, type Member } from '@fridgedoor/contracts';
 import { publicFetch, startSession } from '../../api/client.js';
-import { AuthPage, emptyProfile, errorMessage, FormError, profileBody, ProfileFields, profileProblem, useFocusFirst } from './forms.js';
+import { AddToHomeScreen, AuthPage, emptyProfile, errorMessage, FormError, profileBody, ProfileFields, profileProblem, useFocusFirst } from './forms.js';
 
 type InviteState = { status: 'loading' } | { status: 'invalid' } | { status: 'error' } | { status: 'open'; info: InviteInfo };
 
@@ -63,5 +63,10 @@ function JoinForm({ token, info, onSignedIn, onInvalid }: { token: string; info:
       <button type="submit" disabled={busy}>{busy ? 'Joining…' : `Join ${info.householdName}`}</button>
     </form>
     <p className="muted">Already have an account? <Link to="/login">Sign in</Link></p>
+    <section className="card">
+      <h2>After you join</h2>
+      <p>Save Fridgedoor to your phone’s Home Screen so it opens like an app.</p>
+      <AddToHomeScreen />
+    </section>
   </AuthPage>;
 }

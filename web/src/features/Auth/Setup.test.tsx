@@ -3,10 +3,10 @@ import { useState } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { Member } from '@fridgedoor/contracts';
-import { apiFetch, startSession } from '../../api/client.js';
+import { apiFetch, fetchAuthStatus, startSession } from '../../api/client.js';
 import { SetupWizard } from './Setup.js';
 
-vi.mock('../../api/client.js', () => ({ apiFetch: vi.fn(), startSession: vi.fn() }));
+vi.mock('../../api/client.js', () => ({ apiFetch: vi.fn(), startSession: vi.fn(), fetchAuthStatus: vi.fn() }));
 const owner: Member = { id: 'm1', householdId: 'h1', displayName: 'Alex', timezone: 'America/New_York' };
 const aiSettings = { managedByEnvironment: false, current: null, presets: [{ id: 'anthropic', label: 'Anthropic (Claude)', kind: 'anthropic', baseUrl: null, needsApiKey: true, keyUrl: 'https://console.anthropic.com/settings/keys', suggested: { main: 'claude-sonnet-5-5', email: 'claude-haiku-5-5' }, note: null }] };
 
@@ -38,6 +38,7 @@ it('creates the household, then walks through the optional steps to Home', async
   const writeText = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
   vi.mocked(startSession).mockResolvedValue(owner);
+  vi.mocked(fetchAuthStatus).mockResolvedValue({ setupRequired: false, accessMode: false, publicUrl: 'https://fridgedoor.example.test' });
   renderAt('/setup?token=setup-token-abcdefghijkl');
   expect(screen.getByLabelText('Household name')).toHaveFocus();
   expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'email');
@@ -72,7 +73,11 @@ it('creates the household, then walks through the optional steps to Home', async
   await waitFor(() => expect(writeText).toHaveBeenCalledWith('https://fridgedoor.example.test/dashboard/join/invite-token'));
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
-  expect(await screen.findByRole('heading', { name: 'Connect your iPhone' })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'Put Fridgedoor on your phone' })).toBeVisible();
+  expect(screen.getByText(/in Safari, tap Share, then Add to Home Screen/)).toBeVisible();
+  expect(await screen.findByText('https://fridgedoor.example.test/dashboard/')).toBeVisible();
+  fireEvent.click(screen.getByText('Built the iPhone app yourself?'));
+  fireEvent.click(screen.getByRole('button', { name: 'Show a pairing code' }));
   expect(await screen.findByRole('img', { name: /QR code/ })).toBeVisible();
   expect(screen.getByRole('link', { name: 'Open in the Fridgedoor app' })).toHaveAttribute('href', 'fridgedoor://pair?server=x&code=y');
   fireEvent.click(screen.getByRole('button', { name: 'Finish' }));

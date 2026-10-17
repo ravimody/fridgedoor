@@ -26,7 +26,7 @@ export function PairPhone({ autoStart = false }: { autoStart?: boolean }) {
 
   return <div className="pair-phone">
     <ol>
-      <li>Install the Fridgedoor app on your iPhone.</li>
+      <li>Install the Fridgedoor app on your iPhone. Until it’s in the App Store, that means building it with Xcode.</li>
       <li>Open the iPhone’s Camera and point it at the code below, then tap the Fridgedoor link that appears.</li>
     </ol>
     {pairing && !expired && <>

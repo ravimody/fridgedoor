@@ -20,6 +20,7 @@ it('shows who sent the invite and creates the account', async () => {
   const onSignedIn = renderJoin();
   expect(await screen.findByRole('heading', { name: 'Join The Riveras' })).toBeVisible();
   expect(screen.getByText(/Alex invited you/)).toBeVisible();
+  expect(screen.getByText(/in Safari, tap Share, then Add to Home Screen/)).toBeVisible();
   expect(publicFetch).toHaveBeenCalledWith('/auth/invites/invite-token');
   expect(screen.getByLabelText('Your name')).toHaveFocus();
   expect(screen.getByLabelText('Your name')).toHaveAttribute('autocomplete', 'name');
