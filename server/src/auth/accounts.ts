@@ -104,13 +104,15 @@ export class AccountService {
     return invite ? { householdName: this.householdName(invite.householdId), invitedBy: invite.invitedBy } : null;
   }
 
-  async acceptInvite(token: string, input: ProfileInput): Promise<MemberRecord> {
+  /** Behind Cloudflare Access, `accessSubject` is the joiner's verified Access identity, so the new member can be matched on later visits. */
+  async acceptInvite(token: string, input: ProfileInput, accessSubject?: string): Promise<MemberRecord> {
     const parsed = profileInput.parse(input);
     const passwordHash = await hashPassword(parsed.password);
     return this.db.transaction(() => {
       const invite = this.openInvite(token);
       if (!invite) throw new Error('INVITE_INVALID');
-      const member = this.insertMember(invite.householdId, parsed, passwordHash, 'member');
+      if (accessSubject && this.db.prepare('SELECT 1 FROM members WHERE access_subject = ?').get(accessSubject)) throw new Error('ALREADY_MEMBER');
+      const member = this.insertMember(invite.householdId, parsed, passwordHash, 'member', accessSubject);
       this.db.prepare('UPDATE household_invites SET used_at = ?, used_by = ? WHERE id = ?').run(this.clock().toISOString(), member.id, invite.id);
       return member;
     })();
@@ -187,12 +189,12 @@ export class AccountService {
     })();
   }
 
-  private insertMember(householdId: string, input: ProfileInput, passwordHash: string, role: Role): MemberRecord {
+  private insertMember(householdId: string, input: ProfileInput, passwordHash: string, role: Role, accessSubject?: string): MemberRecord {
     if (this.db.prepare('SELECT 1 FROM member_logins WHERE email = ?').get(input.email)) throw new Error('EMAIL_IN_USE');
-    const id = newId(); const now = this.clock().toISOString();
-    this.db.prepare('INSERT INTO members (id, household_id, access_subject, allowed_email, display_name, timezone, active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)').run(id, householdId, `local:${id}`, input.email, input.displayName, input.timezone, now);
+    const id = newId(); const now = this.clock().toISOString(); const subject = accessSubject ?? `local:${id}`;
+    this.db.prepare('INSERT INTO members (id, household_id, access_subject, allowed_email, display_name, timezone, active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)').run(id, householdId, subject, input.email, input.displayName, input.timezone, now);
     this.db.prepare('INSERT INTO member_logins (member_id, email, password_hash, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run(id, input.email, passwordHash, role, now, now);
-    return { id, householdId, accessSubject: `local:${id}`, allowedEmail: input.email, displayName: input.displayName, timezone: input.timezone, active: true };
+    return { id, householdId, accessSubject: subject, allowedEmail: input.email, displayName: input.displayName, timezone: input.timezone, active: true };
   }
 
   private revokeAll(memberId: string, keepSessionId?: string) {

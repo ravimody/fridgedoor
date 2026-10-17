@@ -87,6 +87,27 @@ describe('sign-in, invites and pairing', () => {
     expect(household.data.members.map((member) => [member.displayName, member.role, member.email])).toEqual([['Alex', 'owner', 'alex@example.test'], ['Sam', 'member', 'sam@example.test']]);
   });
 
+  it('behind Cloudflare Access, links the joiner to their Access identity', async () => {
+    const db = new Database(':memory:'); migrate(db);
+    const config = loadConfig({ NODE_ENV: 'test', SESSION_SECRET: SECRET, APP_ORIGIN: 'https://fridgedoor.example.test' });
+    const now = new Date().toISOString(); const origin = { Origin: 'https://fridgedoor.example.test' };
+    db.prepare('INSERT INTO households (id, created_at) VALUES (?, ?)').run('h1', now);
+    db.prepare('INSERT INTO members (id, household_id, access_subject, display_name, timezone, active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)').run('m1', 'h1', 'subject-alex', 'Alex', 'America/New_York', now);
+    const app = createApp({ db, config, verifyAccess: async (token) => ({ alex: { subject: 'subject-alex' }, sam: { subject: 'subject-sam' } })[token] ?? null });
+    const bootstrap = (who: string) => app.request('/dashboard/api/v1/session', { method: 'POST', headers: { Authorization: `Bearer ${who}`, ...origin, 'X-Planner-Bootstrap': '1' } });
+    const alex = await bootstrap('alex'); const csrf = (await alex.json() as { data: { csrfToken: string } }).data.csrfToken;
+    const invite = await app.request('/dashboard/api/v1/household/invites', { method: 'POST', headers: { Authorization: 'Bearer alex', Cookie: cookieOf(alex), 'X-CSRF-Token': csrf, ...origin } });
+    const token = (await invite.json() as { data: { url: string } }).data.url.split('/').pop()!;
+    const profile = { displayName: 'Sam', email: 'sam@example.test', password: 'another long one', timezone: 'America/Chicago' };
+    expect((await bootstrap('sam')).status).toBe(403);
+    expect((await app.request(`/dashboard/api/v1/auth/invites/${token}`, json(profile, origin))).status).toBe(401);
+    expect((await app.request(`/dashboard/api/v1/auth/invites/${token}`, json(profile, { ...origin, Authorization: 'Bearer sam' }))).status).toBe(200);
+    expect((await bootstrap('sam')).status).toBe(200);
+    const again = await app.request('/dashboard/api/v1/household/invites', { method: 'POST', headers: { Authorization: 'Bearer alex', Cookie: cookieOf(alex), 'X-CSRF-Token': csrf, ...origin } });
+    const second = (await again.json() as { data: { url: string } }).data.url.split('/').pop()!;
+    expect((await app.request(`/dashboard/api/v1/auth/invites/${second}`, json({ ...profile, email: 'sam2@example.test' }, { ...origin, Authorization: 'Bearer sam' }))).status).toBe(409);
+  });
+
   it('removing a member ends their sessions', async () => {
     const ctx = setup(); const { cookie, csrf } = await createOwner(ctx);
     const auth = { Cookie: cookie, 'X-CSRF-Token': csrf, Origin: 'http://fridgedoor.local:8080', 'Content-Type': 'application/json' };

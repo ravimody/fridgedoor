@@ -82,7 +82,7 @@ export function createApp(deps: Dependencies) {
   const accessToken = (c: { req: { header: (name: string) => string | undefined } }) => bearerToken(c.req.header('Authorization')) ?? c.req.header('CF-Access-Jwt-Assertion') ?? '';
   // The outer Access identity when configured; otherwise the member behind the built-in sign-in cookie.
   const browserIdentity = async (c: { req: { header: (name: string) => string | undefined } }) => { if (deps.verifyAccess) return deps.verifyAccess(accessToken(c)); const session = store.lookup(readCookie(c.req.header('Cookie')), loadMember); return session ? { subject: session.member.accessSubject } : null; };
-  const accountDeps = { accounts, store, config: deps.config, settings, limiter, accessMode: Boolean(deps.verifyAccess), memberById: (id: string) => loadMember(id) ?? undefined };
+  const accountDeps = { accounts, store, config: deps.config, settings, limiter, accessMode: Boolean(deps.verifyAccess), ...(deps.verifyAccess ? { accessIdentity: (c: { req: { header: (name: string) => string | undefined } }) => deps.verifyAccess!(accessToken(c)) } : {}), memberById: (id: string) => loadMember(id) ?? undefined };
   registerPublicAccountRoutes(app, accountDeps);
   // Requests re-dispatched by the /native/v1 mount carry a verified native session.
   // Only in-process Request objects can be keys here; no header can claim this identity.
