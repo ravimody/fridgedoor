@@ -6,6 +6,7 @@ const messages: Record<string, string> = {
   TOO_MANY_ATTEMPTS: 'Too many tries in a short time. Wait 15 minutes, then try again.',
   EMAIL_IN_USE: 'That email already has an account here. Sign in instead, or use a different email.',
   SETUP_ALREADY_DONE: 'This household is already set up. Sign in instead.',
+  ALREADY_MEMBER: 'You’re already in this household. Open Fridgedoor to see it.',
   INVITE_INVALID: 'This invite link has expired or was already used. Ask for a new one.',
   PASSWORD_INCORRECT: 'Your current password isn’t right. Try again.',
   VALIDATION: 'Some details weren’t accepted. Check each field and try again.',

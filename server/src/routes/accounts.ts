@@ -18,6 +18,8 @@ type Deps = {
   settings: SettingsStore;
   limiter: AttemptLimiter;
   accessMode: boolean;
+  /** The verified Cloudflare Access identity of the request, when the server runs behind Access. */
+  accessIdentity?: (c: C) => Promise<{ subject: string } | null>;
   memberById: (id: string) => MemberRecord | undefined;
 };
 
@@ -28,7 +30,7 @@ const failure = (c: C, error: unknown) => {
   const code = error instanceof Error ? error.message : '';
   if (code === 'FORBIDDEN') return fail(c, 403, code);
   if (code === 'NOT_FOUND' || code === 'INVITE_INVALID') return fail(c, 404, code);
-  if (['EMAIL_IN_USE', 'SETUP_ALREADY_DONE', 'CANNOT_REMOVE_SELF'].includes(code)) return fail(c, 409, code);
+  if (['EMAIL_IN_USE', 'SETUP_ALREADY_DONE', 'CANNOT_REMOVE_SELF', 'ALREADY_MEMBER'].includes(code)) return fail(c, 409, code);
   if (code === 'PASSWORD_INCORRECT') return fail(c, 403, code);
   throw error;
 };
@@ -104,7 +106,10 @@ export function registerPublicAccountRoutes(app: Hono<{ Variables: Variables }>,
 
   app.post('/dashboard/api/v1/auth/invites/:token', async (c) => {
     if (!sameOrigin(c)) return fail(c, 403, 'FORBIDDEN');
-    try { return start(c, await deps.accounts.acceptInvite(c.req.param('token'), profileInput.parse(await c.req.json()))); }
+    // Behind Access the joiner must arrive with a verified identity, which becomes the new member's subject.
+    const identity = deps.accessIdentity ? await deps.accessIdentity(c) : undefined;
+    if (identity === null) return fail(c, 401, 'UNAUTHENTICATED');
+    try { return start(c, await deps.accounts.acceptInvite(c.req.param('token'), profileInput.parse(await c.req.json()), identity?.subject)); }
     catch (error) { return failure(c, error); }
   });
 }

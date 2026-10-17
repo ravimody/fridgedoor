@@ -55,8 +55,11 @@ settings read-only. See [ai-providers.md](ai-providers.md).
 ## Behind an identity proxy (optional)
 
 If you already protect the server with Cloudflare Access, Fridgedoor can additionally
-require a valid Access identity for the web app. Members must then exist with matching
-subjects. Most installs should leave these unset.
+require a valid Access identity for the web app. Most installs should leave these unset.
+
+To add someone, first allow their email in your Access policy, then send them an invite
+link from Settings. They sign in through Access, and joining links their new account to
+that Access identity.
 
 | Variable | Meaning |
 | --- | --- |
