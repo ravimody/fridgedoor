@@ -7,8 +7,8 @@ helping someone install Fridgedoor. People are welcome to read it too.
 
 Get a working Fridgedoor server running for this household, reachable over HTTPS, and
 hand the person a setup link to open in their browser. The person finishes setup in
-the web app (household, AI provider, email, partner invite, iPhone pairing). Plan on
-5-10 minutes of the person's attention; they may not be technical.
+the web app (household, AI provider, email, partner invite, adding it to their phone).
+Plan on 5-10 minutes of the person's attention; they may not be technical.
 
 ## Ground rules
 
@@ -116,7 +116,9 @@ Tell the person what to expect in the browser:
 1. Create the household and their account.
 2. Choose an AI provider and paste the API key there (the page can test it).
 3. Connect their email with an app password ([email.md](email.md)).
-4. Invite their partner and pair their iPhone by scanning a code ([iphone.md](iphone.md)).
+4. Invite their partner, then add Fridgedoor to their phone: open it in Safari and choose
+   Share → Add to Home Screen. The [iPhone app](iphone.md) needs Xcode until it is in the
+   App Store; only offer it if they build apps.
 
 ## 4. Confirm it works
 

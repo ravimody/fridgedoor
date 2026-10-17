@@ -16,6 +16,14 @@ const messages: Record<string, string> = {
   NETWORK: 'Couldn’t reach Fridgedoor. Check your connection and try again.',
 };
 
+/** Fridgedoor on a phone is the web app saved to the Home Screen; the iPhone app is for people who build it. */
+export function AddToHomeScreen() {
+  return <ul className="home-screen-steps">
+    <li><strong>iPhone:</strong> in Safari, tap Share, then Add to Home Screen.</li>
+    <li><strong>Android:</strong> in Chrome, tap the ⋮ menu, then Add to Home screen (or Install app).</li>
+  </ul>;
+}
+
 /** Plain-language text for an error thrown by the API client. */
 export function errorMessage(error: unknown, overrides: Record<string, string> = {}): string {
   const code = error instanceof TypeError ? 'NETWORK' : error instanceof Error ? error.message : '';

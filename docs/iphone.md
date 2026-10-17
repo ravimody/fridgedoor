@@ -4,6 +4,10 @@ The Fridgedoor iPhone app shows today's plan, your lists and decisions, and adds
 home-screen widgets, Siri ("Ask Fridgedoor…", "Ask Planner…"), the share sheet (send a
 flyer, PDF or web page to the planner), and reminders.
 
+Until the app is in the App Store, only someone who builds it with Xcode can install it
+(see [Installing it](#installing-it)). Everyone else in the household uses the web app:
+open your Fridgedoor address in Safari and choose Share → Add to Home Screen.
+
 Pick a different app icon in **Settings → App icon**.
 
 ## Widgets in the car and the kitchen

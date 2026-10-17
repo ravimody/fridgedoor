@@ -21,9 +21,10 @@ host) with the AI provider you choose. There is no Fridgedoor company in the mid
   it's shared with the household. Stored data is encrypted on your server.
 - **Works with any calendar.** Subscribe from Apple, Google or Outlook calendar, or
   connect Google Calendar to add events directly.
-- **Native iPhone app** with widgets, Siri ("Ask Fridgedoor…"), the share sheet and
-  reminders, an Apple Watch app for the daily brief and quick decisions, plus a web app
-  for everything else.
+- **A web app for everyone** that saves to any phone's Home Screen, plus a native iPhone
+  app with widgets, Siri ("Ask Fridgedoor…"), the share sheet, reminders and an Apple
+  Watch app. Until it's in the App Store, the iPhone app is for whoever builds it with
+  Xcode ([details](docs/iphone.md)).
 - **Any AI model.** OpenAI, Anthropic Claude, Google Gemini, OpenRouter, Groq,
   Mistral, DeepSeek, xAI, Together, Fireworks, Azure OpenAI, or a local model through
   Ollama, LM Studio, llama.cpp or vLLM. Switch any time in Settings.
@@ -72,8 +73,9 @@ Open the setup link, create your household, then follow the steps in the browser
 
 1. **Choose an AI provider** and paste a key ([which one?](docs/ai-providers.md)).
 2. **Connect email** with an app password ([how](docs/email.md)).
-3. **Invite your partner** with a link.
-4. **Connect your iPhone** by scanning a code ([iPhone app](docs/iphone.md)).
+3. **Invite your partner** with a link. They join in their phone's browser.
+4. **Put Fridgedoor on your phone**: open it in Safari and choose Share → Add to Home
+   Screen. If you build the [iPhone app](docs/iphone.md), connect it by scanning a code.
 5. **Subscribe to the calendar** from the calendar app you already use.
 
 ## Privacy and costs
