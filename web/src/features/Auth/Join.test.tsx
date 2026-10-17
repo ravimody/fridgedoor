@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { Member } from '@fridgedoor/contracts';
@@ -21,7 +21,7 @@ it('shows who sent the invite and creates the account', async () => {
   expect(await screen.findByRole('heading', { name: 'Join The Riveras' })).toBeVisible();
   expect(screen.getByText(/Alex invited you/)).toBeVisible();
   expect(publicFetch).toHaveBeenCalledWith('/auth/invites/invite-token');
-  expect(screen.getByLabelText('Your name')).toHaveFocus();
+  await waitFor(() => expect(screen.getByLabelText('Your name')).toHaveFocus());
   expect(screen.getByLabelText('Your name')).toHaveAttribute('autocomplete', 'name');
   fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Sam' } });
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'sam@example.test' } });
