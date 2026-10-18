@@ -1,0 +1,20 @@
+// Build settings shared by the app, the widget extension, the Share extension, the
+// watch app and the watch widgets.
+//
+// Don't put your own team here. Copy Local.xcconfig.example to Local.xcconfig
+// (gitignored) and set DEVELOPMENT_TEAM and FRIDGEDOOR_BUNDLE_PREFIX there.
+// Everything that has to be unique per Apple team derives from the prefix:
+//
+//   app                $(FRIDGEDOOR_BUNDLE_PREFIX)
+//   widget extension   $(FRIDGEDOOR_BUNDLE_PREFIX).widgets
+//   Share extension    $(FRIDGEDOOR_BUNDLE_PREFIX).share
+//   watch app          $(FRIDGEDOOR_BUNDLE_PREFIX).watchkitapp
+//   watch widgets      $(FRIDGEDOOR_BUNDLE_PREFIX).watchkitapp.widgets
+//   App Group          group.$(FRIDGEDOOR_BUNDLE_PREFIX)
+//   Keychain groups    $(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX)[.shared]
+//   Background task    $(FRIDGEDOOR_BUNDLE_PREFIX).refresh
+
+DEVELOPMENT_TEAM =
+FRIDGEDOOR_BUNDLE_PREFIX = dev.fridgedoor
+
+#include? "Local.xcconfig"

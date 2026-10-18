@@ -1,0 +1,33 @@
+import { z } from 'zod';
+import type { Hono } from 'hono';
+import type { Variables } from '../app.js';
+import { codeOrThrow } from '../errors.js';
+import { AttemptLimiter } from '../auth/accounts.js';
+import type { ConnectionService } from '../services/connections.js';
+import { IMAP_PRESETS, imapCredentialsSchema } from '../sync/imap.js';
+import type { MemberRecord } from '../auth/access.js';
+import type { SessionData } from '../auth/session.js';
+
+const imapInput = z.object({ email: z.string().trim().email().max(320), credentials: imapCredentialsSchema }).strict();
+const policyInput = z.object({ excludedSenders: z.array(z.string().email()).max(100), excludedLabels: z.array(z.string().min(1).max(200)).max(100), genericAppointmentOptIn: z.boolean(), expectedRevision: z.number().int().positive() }).strict();
+const calendarInput = z.object({ selections: z.array(z.object({ id: z.string().min(1), selected: z.boolean(), classification: z.enum(['household','personal','work']) }).strict()) }).strict();
+/** `canManage`: household owners can change the shared destination calendar whoever chose it. */
+type RouteDeps = { service: ConnectionService; googleAvailable?: () => boolean; memberFor: (subject: string) => MemberRecord | undefined; canManage?: (member: MemberRecord) => boolean };
+function actorMember(c: { get: (key: 'identity'|'session') => unknown }, deps: RouteDeps) { const identity = c.get('identity') as { subject: string }; const session = c.get('session') as { member: MemberRecord }; const member = deps.memberFor(identity.subject); if (!member || member.id !== session.member.id) throw new Error('UNAUTHENTICATED'); return member; }
+function errorResponse(c: { json: (body: unknown, status: 400 | 401 | 403 | 404 | 409 | 422 | 503) => Response; get: (key: 'requestId') => string }, error: unknown) { const code = codeOrThrow(error); const status = code === 'STALE_REVISION' || code === 'CONNECTION_EXISTS' ? 409 : code === 'VALIDATION' ? 422 : code === 'UNAUTHENTICATED' ? 401 : code === 'DESTINATION_OWNER_ONLY' ? 403 : ['GOOGLE_NOT_CONFIGURED', 'GOOGLE_CLIENT_CONFIGURATION_INCOMPLETE'].includes(code) ? 503 : 400; return c.json({ error: { code, message: code === 'GOOGLE_NOT_CONFIGURED' ? 'Google connection is not configured yet' : code.replaceAll('_', ' ').toLowerCase(), requestId: c.get('requestId') } }, status); }
+export function registerConnectionRoutes(app: Hono<{ Variables: Variables }>, deps: RouteDeps) {
+  const imapTests = new AttemptLimiter(20, 15 * 60_000);
+  app.get('/dashboard/api/v1/connection', (c) => { try { const member = actorMember(c, deps); return c.json({ data: { ...deps.service.status(member.id), googleAvailable: deps.googleAvailable?.() ?? false } }, 200, { 'Cache-Control': 'no-store' }); } catch (error) { return errorResponse(c, error); } });
+  app.post('/dashboard/api/v1/connection/google/start', async (c) => { try { const member = actorMember(c, deps); const input = z.object({ disclosureVersion: z.string().min(1).max(80) }).strict().parse(await c.req.json()); const session = c.get('session') as SessionData; return c.json({ data: await deps.service.start(member, session, input.disclosureVersion) }, 200, { 'Cache-Control': 'no-store' }); } catch (error) { return errorResponse(c, error); } });
+  for (const action of ['pause', 'resume', 'disconnect'] as const) app.post(`/dashboard/api/v1/connection/${action}`, async (c) => { try { const member = actorMember(c, deps); const input = z.object({ expectedRevision: z.number().int().positive() }).strict().parse(await c.req.json()); return c.json({ data: await deps.service.transition(member.id, action, input.expectedRevision) }); } catch (error) { return errorResponse(c, error); } });
+  app.get('/dashboard/api/v1/connection/imap/presets', (c) => c.json({ data: IMAP_PRESETS }));
+  app.post('/dashboard/api/v1/connection/imap/test', async (c) => { try { const tester = actorMember(c, deps); if (!imapTests.allow(`imap-test:${tester.id}`)) return c.json({ error: { code: 'TOO_MANY_ATTEMPTS', message: 'too many attempts', requestId: c.get('requestId') } }, 429); const input = imapInput.parse(await c.req.json()); return c.json({ data: await deps.service.testImap(input.credentials) }); } catch (error) { return errorResponse(c, error); } });
+  app.post('/dashboard/api/v1/connection/imap', async (c) => { try { const member = actorMember(c, deps); const input = imapInput.extend({ disclosureVersion: z.string().min(1).max(80) }).parse(await c.req.json()); return c.json({ data: await deps.service.connectImap(member, input) }, 200, { 'Cache-Control': 'no-store' }); } catch (error) { return errorResponse(c, error); } });
+  app.delete('/dashboard/api/v1/connection/private-data', async (c) => { try { const member = actorMember(c, deps); const input = z.object({ confirm: z.literal(true) }).strict().parse(await c.req.json()); void input; return c.json({ data: deps.service.deletePrivateData(member.id) }); } catch (error) { return errorResponse(c, error); } });
+  app.get('/dashboard/api/v1/source-policy', (c) => { try { const member = actorMember(c, deps); return c.json({ data: deps.service.sourcePolicy(member.id) }); } catch (error) { return errorResponse(c, error); } });
+  app.put('/dashboard/api/v1/source-policy', async (c) => { try { const member = actorMember(c, deps); const input = policyInput.parse(await c.req.json()); return c.json({ data: deps.service.setSourcePolicy(member.id, input) }); } catch (error) { return errorResponse(c, error); } });
+  app.get('/dashboard/api/v1/source-calendars', (c) => { try { const member = actorMember(c, deps); return c.json({ data: deps.service.calendars(member.id) }); } catch (error) { return errorResponse(c, error); } });
+  app.put('/dashboard/api/v1/source-calendars', async (c) => { try { const member = actorMember(c, deps); const input = calendarInput.parse(await c.req.json()); return c.json({ data: await deps.service.setCalendars(member, input.selections) }); } catch (error) { return errorResponse(c, error); } });
+  app.get('/dashboard/api/v1/destination', (c) => { try { const member = actorMember(c, deps); return c.json({ data: deps.service.destination(member.id) }); } catch (error) { return errorResponse(c, error); } });
+  app.put('/dashboard/api/v1/destination', async (c) => { try { const member = actorMember(c, deps); const input = z.object({ ownCalendarSelectionId: z.string().min(1), expectedRevision: z.number().int().positive() }).strict().parse(await c.req.json()); return c.json({ data: deps.service.setDestination(member, input.ownCalendarSelectionId, input.expectedRevision, deps.canManage?.(member) ?? false) }); } catch (error) { return errorResponse(c, error); } });
+}

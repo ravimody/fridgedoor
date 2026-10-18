@@ -1,0 +1,48 @@
+{
+  "name": "@fridgedoor/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "worker": "tsx src/jobs/worker.ts",
+    "dev:native": "tsx src/dev/native-preview.ts",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/ai/fixtures dist/db && cp src/ai/fixtures/*.png dist/ai/fixtures/ && rm -rf dist/db/migrations && cp -R src/db/migrations dist/db/",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "eval:daily": "tsx src/ai/daily-assistant-eval.ts",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "cli": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@fridgedoor/contracts": "workspace:*",
+    "@hono/node-server": "^1.14.1",
+    "better-sqlite3": "^11.8.1",
+    "hono": "^4.7.2",
+    "imapflow": "^1.7.8",
+    "jose": "^6.0.10",
+    "luxon": "^3.7.2",
+    "mailparser": "^3.9.38",
+    "openai": "^7.15.0",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.35.4",
+    "web-push": "^3.6.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/luxon": "^3.7.5",
+    "@types/mailparser": "^3.9.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/web-push": "^3.6.4",
+    "tsx": "^4.19.3",
+    "vitest": "^3.0.5"
+  },
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "fridgedoor": "dist/cli.js"
+  }
+}

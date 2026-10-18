@@ -1,0 +1,40 @@
+import Database from 'better-sqlite3';
+import { describe, it, expect } from 'vitest';
+import { createApp } from '../app.js';
+import { migrate } from '../db/migrate.js';
+
+describe('assistant browser boundary', () => {
+  it('requires Access, CSRF and consent and returns safe validation errors', async () => {
+    const db = new Database(':memory:'); migrate(db); const now = new Date().toISOString();
+    db.prepare('INSERT INTO households (id, created_at) VALUES (?, ?)').run('h', now);
+    db.prepare('INSERT INTO members (id, household_id, access_subject, display_name, timezone, active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)').run('m', 'h', 'sub', 'Member', 'America/New_York', now);
+    const origin = 'https://planner.example.test';
+    const app = createApp({ db, config: { NODE_ENV: 'test', DATABASE_PATH: ':memory:', SESSION_SECRET: 'test-session-secret-change-me-1234567890', APP_ORIGIN: origin, ASSISTANT_ENABLED: 'true', AI_PROVIDER: 'openai', OPENAI_API_KEY: 'synthetic-test-key', AI_MODEL_CHAT: 'test' }, members: () => [{ id: 'm', householdId: 'h', accessSubject: 'sub', displayName: 'Member', timezone: 'America/New_York', active: true }], verifyAccess: async (token) => token === 'valid' ? { subject: 'sub' } : null });
+    const base = '/dashboard/api/v1/assistant';
+    expect((await app.request('/dashboard/api/v1/background-ai')).status).toBe(401);
+    expect((await app.request(`${base}/runs`)).status).toBe(401);
+    expect((await app.request(`${base}/transcribe`, { method: 'POST' })).status).toBe(401);
+    const bootstrap = await app.request('/dashboard/api/v1/session', { method: 'POST', headers: { Authorization: 'Bearer valid', Origin: origin, 'X-Planner-Bootstrap': '1' } });
+    const headers = { Authorization: 'Bearer valid', Origin: origin, Cookie: bootstrap.headers.get('set-cookie')!, 'X-CSRF-Token': (await bootstrap.json()).data.csrfToken, 'Content-Type': 'application/json' };
+    expect((await app.request('/dashboard/api/v1/background-ai', { method: 'POST', headers: { ...headers, 'X-CSRF-Token': 'wrong' }, body: '{"enabled":true,"expectedRevision":0}' })).status).toBe(403);
+    const background = await app.request('/dashboard/api/v1/background-ai', { headers });
+    expect(background.headers.get('cache-control')).toBe('no-store');
+    expect((await background.json()).data.enabled).toBe(false);
+    const audioDenied = await app.request(`${base}/transcribe`, { method: 'POST', headers });
+    expect((await audioDenied.json()).error.code).toBe('ASSISTANT_CONSENT_REQUIRED');
+    expect((await app.request(`${base}/transcribe`, { method: 'POST', headers: { ...headers, 'X-CSRF-Token': 'wrong' } })).status).toBe(403);
+    const denied = await app.request(`${base}/runs`, { method: 'POST', headers, body: JSON.stringify({ clientId: 'one', text: 'hello' }) });
+    expect(denied.status).toBe(400); expect((await denied.json()).error.code).toBe('ASSISTANT_CONSENT_REQUIRED');
+    expect((await app.request(`${base}/settings`, { method: 'POST', headers: { ...headers, 'X-CSRF-Token': 'wrong' }, body: '{"enabled":true}' })).status).toBe(403);
+    expect((await app.request(`${base}/settings`, { method: 'POST', headers, body: '{"enabled":true}' })).status).toBe(200);
+    const staleClient = await app.request(`${base}/knowledge`, { method: 'POST', headers, body: JSON.stringify({ key: 'school', value: 'Example school' }) });
+    expect(staleClient.status).toBe(400); expect((await staleClient.json()).error.code).toBe('STALE_CLIENT');
+    const savedFact = await app.request(`${base}/knowledge`, { method: 'POST', headers, body: JSON.stringify({ key: 'school', value: 'Example school', expectedRevision: 0 }) });
+    expect(savedFact.status).toBe(200); expect((await savedFact.json()).data.revision).toBe(1);
+    const facts = await app.request(`${base}/knowledge`, { headers }); expect((await facts.json()).data[0]).toMatchObject({ key: 'school', revision: 1 });
+    expect((await app.request(`${base}/runs`, { method: 'POST', headers, body: '{"clientId":"one","text":"hello"}' })).status).toBe(202);
+    const invalid = await app.request(`${base}/runs`, { method: 'POST', headers, body: '{"unexpected":"private marker"}' });
+    expect(invalid.status).toBe(400); expect(await invalid.text()).not.toContain('private marker');
+    const list = await app.request(`${base}/runs`, { headers }); expect(list.headers.get('cache-control')).toBe('no-store'); expect((await list.json()).data).toHaveLength(1);
+  });
+});

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fridgedoor</title>
+<meta name="description" content="A household planner you run yourself. It reads school and activity emails and turns them into shared plans, lists and reminders.">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><img src="icon.png" alt=""><a href="/">Fridgedoor</a></header>
+<main>
+  <h1>A household planner you run yourself.</h1>
+  <p class="lead">Fridgedoor reads the school newsletters, team emails, flyers and invitations in your inbox and turns them into a shared plan for your household, next to your grocery and to-do lists.</p>
+  <div class="actions">
+    <a class="button" href="https://github.com/ravimody/fridgedoor#set-up">Set it up</a>
+    <a class="button secondary" href="https://github.com/ravimody/fridgedoor">See the code</a>
+  </div>
+
+  <ul class="features">
+    <li><h3>Reads email for you</h3>Gmail, iCloud, Fastmail or any IMAP mailbox. Clear everyday logistics become suggestions for the household; anything personal or uncertain stays private until you share it.</li>
+    <li><h3>A morning brief</h3>Today's plans and anything waiting on a decision, in one place. Interruptions are rare and only for things due the same day.</li>
+    <li><h3>Ask the planner</h3>Type, speak, or attach a photo of a flyer or a PDF: "dinner with the Parkers Friday 7pm", "add oat milk".</li>
+    <li><h3>Shared lists</h3>Grocery and to-do lists for everyone in the household.</li>
+    <li><h3>On every phone</h3>A web app anyone can add to their Home Screen. There is also an iPhone app with widgets, Siri, the share sheet, reminders and an Apple Watch app, for now only for people who build it themselves with Xcode.</li>
+    <li><h3>Any AI, your server</h3>OpenAI, Claude, Gemini, OpenRouter or a model on your own computer. Your data stays in one file on a server you control.</li>
+  </ul>
+
+  <h2 id="set-up">Set it up</h2>
+  <p>Run it on a computer at home, a free cloud server or a small paid host. One command installs it and gives you a setup link, and you do the rest in your browser.</p>
+  <p><code>curl -fsSL https://raw.githubusercontent.com/ravimody/fridgedoor/main/deploy/install.sh | bash</code></p>
+  <p>The <a href="https://github.com/ravimody/fridgedoor/blob/main/docs/hosting/README.md">hosting guide</a> compares where to run it. You can also give <a href="https://github.com/ravimody/fridgedoor/blob/main/docs/setup-with-an-ai-agent.md">the AI setup guide</a> to Claude Code or Codex and let it do the setup.</p>
+
+  <h2>Privacy</h2>
+  <p>There's no Fridgedoor company in the middle and no tracking. Your household's data lives on your server. It goes only to services your household chooses: your AI provider and email account, and Google Calendar and phone notification services if you use them. <a href="privacy.html">How privacy works</a>.</p>
+</main>
+<footer><span>Open source: server AGPL-3.0, iPhone app MPL-2.0.</span><a href="privacy.html">Privacy</a><a href="support.html">Support</a></footer>
+</body>
+</html>

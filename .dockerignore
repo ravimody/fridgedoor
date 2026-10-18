@@ -1,0 +1,24 @@
+# Secrets and local data never go into the build context.
+.env
+.env.*
+**/.env
+**/.env.*
+data
+*.sqlite
+*.sqlite-*
+**/*.sqlite
+**/*.sqlite-*
+secret.key
+**/secret.key
+# Build output and dependencies are rebuilt inside the image.
+**/node_modules
+**/dist
+.git
+playwright-report
+test-results
+# Not part of the image: the build only needs package.json files, packages/, server/, web/ and deploy/.
+ios
+site
+e2e
+work
+docs

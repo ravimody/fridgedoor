@@ -1,0 +1,1 @@
+export function validateCaptureUrl(value: string) { let url: URL; try { url = new URL(value); } catch { throw new Error('INVALID_CAPTURE_URL'); } if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port) throw new Error('INVALID_CAPTURE_URL'); return url.toString(); }

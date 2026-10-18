@@ -1,0 +1,33 @@
+# Fly.io: fly launch --copy-config --no-deploy, then fly volumes create fridgedoor_data --size 1,
+# then fly deploy. See docs/hosting/fly.md.
+app = "fridgedoor-CHANGE-ME"
+primary_region = "iad"
+
+[build]
+  image = "ghcr.io/ravimody/fridgedoor:latest"
+
+[env]
+  TRUST_PROXY = "true"
+  CLIENT_IP_HEADER = "Fly-Client-IP"
+
+[mounts]
+  source = "fridgedoor_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # The worker reads email and sends reminders in the background, so keep one machine running.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

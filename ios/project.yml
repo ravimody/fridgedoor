@@ -1,0 +1,222 @@
+name: Fridgedoor
+options:
+  deploymentTarget:
+    iOS: "26.0"
+    watchOS: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+# DEVELOPMENT_TEAM and FRIDGEDOOR_BUNDLE_PREFIX come from Config/Base.xcconfig,
+# overridden per contributor by the gitignored Config/Local.xcconfig.
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+settings:
+  base:
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+packages:
+  FridgedoorKit:
+    path: FridgedoorKit
+# Every target's source folder has its own PrivacyInfo.xcprivacy (XcodeGen copies it as
+# a resource). A new target needs one too, declaring the required-reason APIs it links.
+targets:
+  Fridgedoor:
+    type: application
+    platform: iOS
+    sources:
+      - Fridgedoor
+    dependencies:
+      - package: FridgedoorKit
+      - target: FridgedoorWidgets
+      - target: FridgedoorShare
+      - target: FridgedoorWatch
+    entitlements:
+      path: Fridgedoor/Resources/Fridgedoor.entitlements
+      properties:
+        com.apple.security.application-groups: [group.$(FRIDGEDOOR_BUNDLE_PREFIX)]
+        # First group is the default: session tokens stay app-only. The shared
+        # group holds only the Share extension's capture-only credential.
+        keychain-access-groups: [$(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX), $(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared]
+    info:
+      path: Fridgedoor/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Fridgedoor
+        # Siri also answers to "Planner" ("Ask Planner", "What needs me in Planner")
+        # and "Fridge door" ("What's on the fridge door"), which is also how
+        # VoiceOver and Siri say the app's name.
+        CFBundleSpokenName: Fridge door
+        INAlternativeAppNames:
+          - INAlternativeAppName: Planner
+          - INAlternativeAppName: Fridge door
+            INAlternativeAppNamePronunciationHint: fridge door
+        UILaunchScreen:
+          UIColorName: Paper
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        CFBundleURLTypes:
+          - CFBundleURLName: $(FRIDGEDOOR_BUNDLE_PREFIX)
+            CFBundleURLSchemes: [fridgedoor]
+        # Home servers often have no certificate. ServerAddress (FridgedoorKit) only
+        # allows http for local hosts; NSAllowsLocalNetworking covers IP addresses,
+        # single-label names and .local, the exceptions cover the other local suffixes.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+          NSExceptionDomains:
+            ts.net: { NSIncludesSubdomains: true, NSExceptionAllowsInsecureHTTPLoads: true }
+            home.arpa: { NSIncludesSubdomains: true, NSExceptionAllowsInsecureHTTPLoads: true }
+            lan: { NSIncludesSubdomains: true, NSExceptionAllowsInsecureHTTPLoads: true }
+            internal: { NSIncludesSubdomains: true, NSExceptionAllowsInsecureHTTPLoads: true }
+        NSMicrophoneUsageDescription: Speak a request to your planner. Speech is transcribed on this iPhone when possible, otherwise by the planner's transcription service.
+        NSSpeechRecognitionUsageDescription: Turn what you say into a planner request on this iPhone.
+        NSCameraUsageDescription: Scan the pairing code from Fridgedoor on the web, or take a photo of a flyer, invitation or note so your planner can read it.
+        # No photo library or calendar usage strings: PhotosPicker runs out of process and
+        # needs no access, and "Add to Apple Calendar" uses EKEventEditViewController,
+        # which on iOS 17+ also needs no calendar access.
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [$(FRIDGEDOOR_BUNDLE_PREFIX).refresh]
+        ITSAppUsesNonExemptEncryption: false
+        PlannerAppGroup: group.$(FRIDGEDOOR_BUNDLE_PREFIX)
+        PlannerKeychainGroup: $(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(FRIDGEDOOR_BUNDLE_PREFIX)
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Settings → App icon offers these (scripts/make-icon.swift draws all three).
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIcon-RisingSun AppIcon-FullPage
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+  FridgedoorWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widgets
+      # These intents run in the app; the extension only needs their declarations.
+      - Fridgedoor/Platform/Intents/OpenComposerIntent.swift
+      - Fridgedoor/Platform/Intents/WidgetIntents.swift
+    dependencies:
+      - package: FridgedoorKit
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    entitlements:
+      path: Widgets/Widgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.$(FRIDGEDOOR_BUNDLE_PREFIX)]
+        # Snapshot fallback when the App Group can't be provisioned (free team).
+        keychain-access-groups: [$(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared]
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: Fridgedoor
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        PlannerAppGroup: group.$(FRIDGEDOOR_BUNDLE_PREFIX)
+        PlannerKeychainGroup: $(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(FRIDGEDOOR_BUNDLE_PREFIX).widgets
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) WIDGET_EXTENSION
+  FridgedoorShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - ShareExtension
+    dependencies:
+      - package: FridgedoorKit
+    entitlements:
+      path: ShareExtension/ShareExtension.entitlements
+      properties:
+        com.apple.security.application-groups: [group.$(FRIDGEDOOR_BUNDLE_PREFIX)]
+        keychain-access-groups: [$(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared]
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Fridgedoor
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 1
+              NSExtensionActivationSupportsFileWithMaxCount: 1
+        PlannerAppGroup: group.$(FRIDGEDOOR_BUNDLE_PREFIX)
+        PlannerKeychainGroup: $(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(FRIDGEDOOR_BUNDLE_PREFIX).share
+        TARGETED_DEVICE_FAMILY: "1"
+  # Apple Watch companion: the daily brief, today's plans and quick decisions. It has
+  # no credential of its own; the iPhone app sends it data and runs what it asks
+  # (Fridgedoor/Platform/WatchBridge.swift).
+  FridgedoorWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - Watch/App
+    dependencies:
+      - package: FridgedoorKit
+      - target: FridgedoorWatchWidgets
+    entitlements:
+      path: Watch/App/FridgedoorWatch.entitlements
+      properties:
+        com.apple.security.application-groups: [group.$(FRIDGEDOOR_BUNDLE_PREFIX)]
+        keychain-access-groups: [$(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared]
+    info:
+      path: Watch/App/Info.plist
+      properties:
+        CFBundleDisplayName: Fridgedoor
+        CFBundleSpokenName: Fridge door
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: $(FRIDGEDOOR_BUNDLE_PREFIX)
+        WKRunsIndependentlyOfCompanionApp: false
+        ITSAppUsesNonExemptEncryption: false
+        PlannerAppGroup: group.$(FRIDGEDOOR_BUNDLE_PREFIX)
+        PlannerKeychainGroup: $(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(FRIDGEDOOR_BUNDLE_PREFIX).watchkitapp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "4"
+  FridgedoorWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - Watch/Widgets
+    dependencies:
+      - package: FridgedoorKit
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    entitlements:
+      path: Watch/Widgets/WatchWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.$(FRIDGEDOOR_BUNDLE_PREFIX)]
+        keychain-access-groups: [$(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared]
+    info:
+      path: Watch/Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: Fridgedoor
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        PlannerAppGroup: group.$(FRIDGEDOOR_BUNDLE_PREFIX)
+        PlannerKeychainGroup: $(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(FRIDGEDOOR_BUNDLE_PREFIX).watchkitapp.widgets
+        TARGETED_DEVICE_FAMILY: "4"
+schemes:
+  Fridgedoor:
+    build:
+      targets:
+        Fridgedoor: all
+    run:
+      config: Debug
+    test:
+      config: Debug

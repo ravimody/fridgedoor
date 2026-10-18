@@ -1,0 +1,133 @@
+import { TaskActions } from '../Lists/TaskActions.js';
+import {ReviewItem} from './ReviewItem.js';
+import type {DailyView} from './PlannerContext.js';
+import { calendarOutcome, outcomeLabels, requestOutcomes } from '@fridgedoor/contracts';
+import { inScheduleRange, scheduleLabel as when, scheduleStart } from './schedule-time.js';
+import { AddedListItem } from './AddedListItem.js';
+import { useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { DateTime } from 'luxon';
+import type { AssistantResult, AssistantRun, PlanSummary } from '@fridgedoor/contracts';
+import { apiFetch } from '../../api/client.js';
+import { post, usePlanner } from './PlannerContext.js';
+type Item = AssistantResult['items'][number];
+function sourceLinks(sources: string[]) { return sources.flatMap((source) => { try { const url = new URL(source); return ['https:', 'http:'].includes(url.protocol) ? [url] : []; } catch { return []; } }); }
+function CalendarState({ state, kind = 'create' }: { state: string; kind?: string }) { return <p role="status">{outcomeLabels[calendarOutcome({ state, kind })]}{state === 'needs_reauth' ? ' · Reconnect Google in Settings → Email.' : state === 'conflict' ? ' · The event changed in Google. Open details to review.' : state === 'failed' ? ' · Open details to check the calendar action.' : ''}</p>; }
+/**
+ * Adding to the household calendar needs an active Google connection with a chosen calendar. An app-password (IMAP)
+ * connection can't write calendars, so it gets no action; with nothing connected, point at email setup.
+ */
+function CalendarAction({ disabled, onAdd }: { disabled: boolean; onAdd: () => void }) {
+  const { connection, destination } = usePlanner();
+  if (connection.provider === 'imap') return null;
+  if (connection.provider === 'google' && connection.status === 'active') return destination?.ownCalendarSelectionId ? <button disabled={disabled} onClick={onAdd}>Add to calendar</button> : <Link to="/settings/calendar">Choose a calendar</Link>;
+  return <Link to="/settings/email">Connect email</Link>;
+}
+function PlanCard({ plan }: { plan: PlanSummary }) {
+  const planner = usePlanner(); const facts = plan.pendingFacts ?? plan.facts;
+  return <article className="decision-item"><h3>{facts.title}</h3><p>{when(facts.time, planner.timezone)}</p>{facts.location && <p>{facts.location}</p>}
+    {plan.calendarAction ? <CalendarState state={plan.calendarAction.state} kind={plan.calendarAction.kind ?? 'create'} /> : plan.savedInPlanner && <p>Saved · {plan.visibility === 'private' ? 'Only you' : 'Household'}</p>}
+    {!plan.calendarAction && <div className="button-row"><CalendarAction disabled={planner.busy || !facts.time || facts.time.kind === 'unresolved' || facts.time.kind === 'deadline' || facts.unresolvedFields.length > 0} onAdd={() => void planner.act(() => post(`/plans/${plan.id}/decision`, { expectedRevision: plan.revision, choice: 'calendar' }))} />{!plan.savedInPlanner && <button className="secondary" disabled={planner.busy} onClick={() => void planner.act(() => post(`/plans/${plan.id}/decision`, { expectedRevision: plan.revision, choice: 'keep' }))}>Save</button>}</div>}
+    <div className="button-row"><Link to={`/plans/${plan.id}`}>Edit / details</Link>{!plan.calendarAction && <button className="secondary" disabled={planner.busy} onClick={() => void planner.act(() => post(`/plans/${plan.id}/dismiss`, { expectedRevision: plan.revision }))}>Dismiss</button>}</div>
+  </article>;
+}
+function ProposedItem({ run, item, index }: { run: AssistantRun; item: Item; index: number }) {
+  const planner = usePlanner(); const [editing, setEditing] = useState(false); const [draft, setDraft] = useState(item);
+  const receipt = run.reviews?.find((entry) => entry.target === `item:${index}`);
+  const plan = receipt?.planId ? planner.plans.find((entry) => entry.id === receipt.planId) : undefined;
+  if (receipt?.automatic) return <p><AddedListItem run={run} index={index} /></p>;
+  if (plan) return <PlanCard plan={plan} />;
+  if (receipt?.planId) return <p><Link to={`/plans/${receipt.planId}`}>{item.title} · View saved event</Link></p>;
+  if (receipt && receipt.state !== 'draft') return <p>{item.title} · {receipt.state === 'dismissed' ? 'Dismissed' : receipt.state === 'calendar' ? 'Checking calendar status…' : 'Saved'}</p>;
+  const decide = (choice: string) => planner.act(() => post(`/assistant/runs/${run.id}/review`, { target: 'item', index, choice, ...(JSON.stringify(draft) !== JSON.stringify(item) ? { edited: draft } : {}) }));
+  return <article className="decision-item"><h3>{draft.title}</h3>
+    {draft.start && <p>{DateTime.fromISO(draft.start, { zone: planner.timezone }).toFormat('ccc, LLL d · h:mm a')}{draft.end && ` – ${DateTime.fromISO(draft.end, { zone: planner.timezone }).toFormat('h:mm a')}`}</p>}{draft.quantity && <p>{draft.quantity}</p>}{draft.location && <p>{draft.location}</p>}{draft.notes && <p>{draft.notes}</p>}
+    {editing && <div className="capture-card"><label>Title<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>{draft.kind === 'event' && <>{(['start', 'end'] as const).map((key) => <label key={key}>{key === 'start' ? 'Start' : 'End'}<input type="datetime-local" value={draft[key] ? DateTime.fromISO(draft[key]!, { zone: planner.timezone }).toFormat("yyyy-MM-dd'T'HH:mm") : ''} onChange={(event) => setDraft({ ...draft, [key]: event.target.value ? DateTime.fromISO(event.target.value, { zone: planner.timezone }).toISO() : null })} /></label>)}<label>Location<input value={draft.location ?? ''} onChange={(event) => setDraft({ ...draft, location: event.target.value || null })} /></label></>}<label>Notes<textarea value={draft.notes ?? ''} onChange={(event) => setDraft({ ...draft, notes: event.target.value || null })} /></label></div>}
+    <div className="button-row">{draft.kind === 'event' ? <><CalendarAction disabled={planner.busy || !draft.start || !draft.end || !draft.title.trim()} onAdd={() => void decide('calendar')} /><button className="secondary" disabled={planner.busy || !draft.title.trim()} onClick={() => void decide('keep')}>Save</button></> : <button disabled={planner.busy || !draft.title.trim()} onClick={() => void decide('save')}>{draft.kind === 'grocery' ? 'Add to groceries' : 'Add to To do'}</button>}<button className="secondary" disabled={planner.busy} onClick={() => setEditing(!editing)}>{editing ? 'Close editor' : 'Edit'}</button><button className="secondary" disabled={planner.busy} onClick={() => void decide('dismiss')}>Dismiss</button></div>
+    {draft.kind === 'event' && (!draft.start || !draft.end) && <p className="muted">Fill in the missing time to add it to the calendar, or save it without one.</p>}
+  </article>;
+}
+function Request({ run, expanded = false }: { run: AssistantRun; expanded?: boolean }) {
+  const planner = usePlanner();
+  return <details className="card request-card" open={expanded || undefined}><summary>{run.result?.items[0]?.title ?? (run.text.slice(0, 100) || 'Photo or PDF')} <span className="muted">{` · ${requestOutcomes(run, planner.plans).map((outcome) => outcomeLabels[outcome]).join(' · ')}`}</span></summary>
+    {run.state === 'failed' && <p>Could not finish. <button disabled={planner.busy} onClick={() => void planner.act(() => post(`/assistant/runs/${run.id}/retry`))}>Retry</button></p>}
+    {run.result && <><p className="preserve-lines">{run.result.reply}</p><p role="status">{requestOutcomes(run, planner.plans).map((outcome) => outcomeLabels[outcome]).join(' · ')}</p>{run.result.assumptions.length > 0 && <p className="notice">Assumptions: {run.result.assumptions.join(' ')}</p>}{run.result.items.map((item, index) => <ProposedItem key={index} run={run} item={item} index={index} />)}
+      {run.result.knowledge.map((fact, index) => <div key={index} className="decision-item"><p>{fact.operation === 'delete' ? 'Forget' : 'Remember'}: {fact.key.replaceAll('_', ' ')}{fact.value && ` · ${fact.value}`}</p>{run.reviews?.some((entry) => entry.target === `knowledge:${index}`) ? <p>Reviewed</p> : <div className="button-row"><button disabled={planner.busy} onClick={() => void planner.act(() => post(`/assistant/runs/${run.id}/review`, { target: 'knowledge', index, choice: 'save' }))}>{fact.operation === 'delete' ? 'Forget fact' : 'Remember fact'}</button><button className="secondary" disabled={planner.busy} onClick={() => void planner.act(() => post(`/assistant/runs/${run.id}/review`, { target: 'knowledge', index, choice: 'dismiss' }))}>Dismiss</button></div>}</div>)}
+      {run.result.followups.length > 0 && <details><summary>Additional suggestions</summary><p>{run.result.followups.join(' ')}</p><p className="muted">These do not block approval of complete items above.</p></details>}
+      {sourceLinks(run.result.sources).map((url, index) => <p key={index}><a href={url.href} target="_blank" rel="noreferrer">{url.hostname}</a></p>)}
+      <div className="button-row"><button className="secondary" disabled={planner.busy || run.feedback === 'helpful'} onClick={() => void planner.act(() => post(`/assistant/runs/${run.id}/feedback`, { value: 'helpful' }))}>Helpful</button><button className="secondary" disabled={planner.busy || run.feedback === 'needs_work'} onClick={() => void planner.act(() => post(`/assistant/runs/${run.id}/feedback`, { value: 'needs_work' }))}>Needs work</button></div></>}
+    <details><summary>Request details</summary><p>{run.text}</p><button className="secondary" disabled={planner.busy} onClick={() => void planner.act(() => apiFetch(`/assistant/runs/${run.id}`, { method: 'DELETE' }))}>Delete request</button><p className="muted">Saved items and calendar events are kept.</p></details>
+  </details>;
+}
+function ClarificationCard({ clarification }: { clarification: ReturnType<typeof usePlanner>['clarifications'][number] }) {
+  const planner = usePlanner(); const [answer, setAnswer] = useState(''); const [busy, setBusy] = useState(false);
+  if (clarification.state === 'answered') return <article className="decision-item"><h3>{clarification.question}</h3><p className="muted">Answered</p><p className="preserve-lines">{clarification.answer}</p></article>;
+  async function submit() { if (!answer.trim()) return; setBusy(true); await planner.act(() => post(`/clarifications/${clarification.id}/answer`, { text: answer, expectedRevision: clarification.revision })); setBusy(false); }
+  return <article className="decision-item"><h3>{clarification.question}</h3><p>{clarification.reason}</p><label>Answer<textarea maxLength={500} value={answer} disabled={busy || planner.busy} onChange={(event) => setAnswer(event.target.value)} /></label><div className="button-row"><button disabled={busy || planner.busy || !answer.trim()} onClick={() => void submit()}>Save answer</button><button className="secondary" disabled={busy || planner.busy} onClick={() => void planner.act(() => post(`/clarifications/${clarification.id}/dismiss`, { expectedRevision: clarification.revision }))}>Dismiss</button></div></article>;
+}
+type Review = DailyView['items'][number];
+function needsAttention(item:Review) { return item.category==='decision' || item.category==='deadline'; }
+function ReviewCard({item,tone='fyi'}:{item:Review;tone?:'attention'|'fyi'}) {
+  const planner=usePlanner();
+  const tasks=(item.targets??[]).filter(target=>target.kind==='task').flatMap(target=>{const task=planner.todos.find(todo=>todo.id===target.id);return task?[task]:[];});
+  const taskItem=(item.targets??[]).some(target=>target.kind==='task');
+  return <ReviewItem title={item.title} tone={tone} disabled={planner.busy} onDismiss={taskItem ? undefined : ()=>void planner.dismissMorningItem(item.refs,planner.dailyOverview!.revision)}><h3>{item.href && item.href!=='/' ? <Link to={item.href}>{item.title}</Link>:item.title}</h3>{item.normalizedTime && <p className="review-time">{when(item.normalizedTime,planner.timezone)}</p>}<p>{item.detail}</p>{tasks.map(task=><TaskActions key={task.id} item={task} timezone={planner.timezone} onSaved={()=>planner.refresh()} />)}</ReviewItem>;
+}
+function ReviewStatus() {
+  const planner=usePlanner(), overview=planner.dailyOverview;const [refreshing,setRefreshing]=useState(false);
+  if(!overview)return null;
+  const incomplete=overview.coverage.filter(entry=>['stale','unavailable','truncated'].includes(entry.status));
+  async function refresh(){setRefreshing(true);await planner.act(()=>post('/daily-overview/refresh',{expectedRevision:planner.dailySettings.revision}));setRefreshing(false);}
+  return <div className="review-status">{overview.state==='unavailable' && <p role="status" className="notice">{overview.result.summary}</p>}{overview.state==='fallback' && <p className="muted">The AI morning brief is off.</p>}<details><summary>{incomplete.length ? incomplete.map(entry=>`${entry.channel[0]!.toUpperCase()+entry.channel.slice(1)}: ${entry.status==='truncated'?'review limit reached':entry.status==='stale'?'sync delayed':'data unavailable'}`).join(' · ') : 'Morning brief details'}</summary>{overview.generatedAt && <p>Updated {DateTime.fromISO(overview.generatedAt).setZone(planner.timezone).toFormat('ccc, LLL d · h:mm a')}</p>}{incomplete.map(entry=><p key={entry.channel}>{entry.status==='truncated' ? `${entry.omittedCount??0} ${entry.channel} items were outside the morning brief’s size limit.` : entry.status==='stale' ? `${entry.channel}: the last sync is older than expected; recent changes may be missing.` : `${entry.channel}: data could not be loaded for this review.`}</p>)}<button className="secondary" disabled={refreshing||planner.busy||!planner.dailySettings.enabled} onClick={()=>void refresh()}>{refreshing||overview.errorCode==='DAILY_OVERVIEW_UPDATING'?'Updating…':'Refresh brief'}</button><p>Swipe left on a suggestion in the brief, or use its options menu, to dismiss it. Dismissal does not change your plans or preferences.</p></details></div>;
+}
+function timeColumn(time:PlanSummary['facts']['time'],zone:string){if(time?.kind==='all_day')return 'All day';if(time?.kind==='unresolved')return 'Time open';return scheduleStart(time,zone)?.setZone(zone).toFormat('h:mm a')??'Any time';}
+export function Home() {
+  const planner=usePlanner();const [selected,setSelected]=useState<string|null>(null);
+  const today=DateTime.now().setZone(planner.timezone).startOf('day');
+  const days=Array.from({length:7},(_,i)=>today.plus({days:i}));
+  const chosen=days.find(day=>day.toISODate()===selected)??today;const isToday=chosen.equals(today);
+  const inRange=(time:PlanSummary['facts']['time'])=>inScheduleRange(time,chosen,chosen.plus({days:1}),planner.timezone);
+  const saved=planner.plans.filter(plan=>(plan.savedInPlanner||plan.calendarAction?.state==='succeeded'||['update','cancel'].includes(plan.calendarAction?.kind??''))&&!['dismissed','archived'].includes(plan.status));
+  const events=[...planner.agenda.map(item=>({key:'calendar:'+item.id,title:item.title,time:item.time,origin:item.origin+(item.status==='tentative'?' · Tentative':''),href:item.planId?`/plans/${item.planId}`:null,ids:['calendar:'+item.id,...(item.planId?['plan:'+item.planId]:[])]})),...saved.filter(plan=>!planner.agenda.some(item=>item.planId===plan.id)).map(plan=>({key:'plan:'+plan.id,title:plan.facts.title,time:plan.facts.time,origin:plan.calendarAction?.state==='succeeded'?'Household calendar':`Saved${plan.visibility==='private'?' · Only you':''}`,href:`/plans/${plan.id}`,ids:['plan:'+plan.id]})),...planner.todos.filter(todo=>!todo.completedAt&&todo.dueTime&&(!todo.snoozedUntil||todo.snoozedUntil<=chosen.toISODate()!)).map(todo=>({key:'task:'+todo.id,title:todo.title,time:/^\d{4}-\d{2}-\d{2}$/.test(todo.dueTime!)?{kind:'all_day' as const,startDate:todo.dueTime!,endDateExclusive:DateTime.fromISO(todo.dueTime!,{zone:planner.timezone}).plus({days:1}).toISODate()!}:{kind:'deadline' as const,at:todo.dueTime!,timezone:planner.timezone},origin:'To do · remind on',href:'/todos',ids:['task:'+todo.id]}))];
+  const schedule=events.filter(item=>inRange(item.time)).sort((a,b)=>(scheduleStart(a.time,planner.timezone)?.toMillis()??0)-(scheduleStart(b.time,planner.timezone)?.toMillis()??0));
+  const overview=planner.dailyOverview;const reviews=overview?.items??[];
+  const attention=reviews.filter(needsAttention);
+  const represented=new Set(schedule.flatMap(item=>item.ids));
+  const routine=reviews.filter(item=>!needsAttention(item)&&item.category==='today'&&!(item.targets?.length && item.targets.every(target=>represented.has(target.kind+':'+target.id))));
+  const upcoming=reviews.filter(item=>!needsAttention(item)&&item.category!=='today');
+  const relevantReminders=planner.reminders.filter(item=>item.state==='active' && !(item.parentType==='list_item'&&planner.todos.some(task=>task.id===item.parentId)) && (isToday ? DateTime.fromISO(item.dueAt).toMillis()<chosen.plus({days:1}).toMillis():inRange({kind:'deadline',at:item.dueAt,timezone:planner.timezone})));
+  return <main className="page home-page daily-overview"><div className="home-heading"><p className="eyebrow">Your household</p><h1>{isToday?'Today':chosen.toFormat('cccc')}</h1><p className="muted">{chosen.toFormat('LLLL d')} · {isToday?'Your morning brief':'Looking ahead'}</p></div>
+    <div className="day-picker" role="group" aria-label="Choose a day">{days.map(day=><button key={day.toISODate()} aria-label={day.toFormat('cccc, LLLL d')} aria-pressed={day.equals(chosen)} onClick={()=>setSelected(day.toISODate())}><span>{day.toFormat('ccc')}</span><strong>{day.day}</strong><i className={events.some(item=>inScheduleRange(item.time,day,day.plus({days:1}),planner.timezone))?'has-plans':''} aria-hidden="true"/></button>)}</div>
+    {!planner.loaded && <p role="status">Loading your plans…</p>}
+    {!isToday && attention.length>0 && <button className="today-attention" onClick={()=>setSelected(null)}>{attention.length} {attention.length===1?'item needs':'items need'} your attention today →</button>}
+    {isToday && <><ReviewStatus />{overview?.state==='ready' && !['Your remaining morning review.','Your morning review'].includes(overview.result.summary) && <p className="morning-summary">{overview.result.summary}</p>}{attention.length>0 && <section className="attention-section"><div className="module-heading"><h2>Needs your attention</h2><span>{attention.length}</span></div>{attention.map(item=><ReviewCard key={item.refs.join(':')} item={item} tone="attention"/>)}</section>}{planner.clarifications?.filter(item=>item.state==='open').map(item=><section className="attention-section" key={item.id}><ClarificationCard clarification={item}/></section>)}</>}
+    <section className="schedule-module"><div className="module-heading"><h2>{isToday?'Today’s rhythm':chosen.toFormat('cccc')+'’s plans'}</h2><span>Schedule</span></div>{schedule.length>0?<ol className="day-agenda">{schedule.map(item=><li key={item.key}><span className="agenda-time">{timeColumn(item.time,planner.timezone)}</span><article><h3>{item.href?<Link to={item.href}>{item.title}</Link>:item.title}</h3><p>{when(item.time,planner.timezone)}</p><small>{item.origin}</small>{item.key.startsWith('task:') && planner.todos.filter(task=>'task:'+task.id===item.key).map(task=><TaskActions key={task.id} item={task} timezone={planner.timezone} onSaved={()=>planner.refresh()} />)}</article></li>)}</ol>:planner.loaded && <p className="day-empty">No scheduled plans{isToday?' today':' for this day'}.</p>}{isToday && routine.map(item=><ReviewCard key={item.refs.join(':')} item={item}/>)}</section>
+    {relevantReminders.length>0 && <section><div className="module-heading"><h2>Reminders</h2></div>{relevantReminders.map(item=><details className="reminder-module" key={item.id}><summary>{item.title??planner.plans.find(plan=>plan.id===item.parentId)?.facts.title??planner.todos.find(todo=>todo.id===item.parentId)?.title??'Household reminder'}<small>{DateTime.fromISO(item.dueAt).setZone(planner.timezone).toFormat('ccc, LLL d · h:mm a')}</small></summary><div className="button-row">{[{label:'Remind me in 15 minutes',fields:{snoozeUntil:DateTime.now().plus({minutes:15}).toUTC().toISO()}},{label:'Done',fields:{completed:true}},{label:'Cancel reminder',fields:{canceled:true}}].map(choice=><button className="secondary" key={choice.label} disabled={planner.busy} onClick={()=>void planner.act(()=>apiFetch(`/reminders/${item.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedRevision:item.revision,...choice.fields})}))}>{choice.label}</button>)}</div></details>)}</section>}
+    {isToday && upcoming.length>0 && <section><div className="module-heading"><h2>On the horizon</h2><span>Worth a look</span></div>{upcoming.map(item=><ReviewCard key={item.refs.join(':')} item={item}/>)}</section>}
+    {planner.morningUndo && <div className="morning-undo" role="status"><span>Dismissed from your brief</span><button disabled={planner.busy} onClick={()=>void planner.undoMorningDismiss()}>Undo</button></div>}
+  </main>;
+}
+export function PlannerArchive({history=false}:{history?:boolean}) {
+  const planner=usePlanner();const [all,setAll]=useState(false);const inRange=(time:PlanSummary['facts']['time'])=>inScheduleRange(time,DateTime.now().setZone(planner.timezone).startOf('day'),DateTime.now().setZone(planner.timezone).startOf('day').plus({days:7}),planner.timezone);
+  const needsPlan = (plan: PlanSummary) => !['dismissed', 'archived'].includes(plan.status) && (plan.calendarAction ? plan.calendarAction.state !== 'succeeded' || Boolean(plan.pendingFacts) : !plan.savedInPlanner);
+  const pendingRuns = planner.runs.filter((run) => run.state !== 'succeeded' || run.result?.items.some((_, index) => { const receipt = run.reviews?.find((entry) => entry.target === `item:${index}`); return !receipt || (receipt.planId && planner.plans.some((plan) => plan.id === receipt.planId && needsPlan(plan))); }) || run.result?.knowledge.some((_, index) => !run.reviews?.some((entry) => entry.target === `knowledge:${index}`)));
+  const linked = new Set(planner.runs.flatMap((run) => (run.reviews ?? []).map((entry) => entry.planId)));
+  const pendingPlans = planner.plans.filter((plan) => needsPlan(plan) && !linked.has(plan.id));
+  const saved = planner.plans.filter((plan) => (plan.savedInPlanner || plan.calendarAction?.state === 'succeeded' || ['update', 'cancel'].includes(plan.calendarAction?.kind ?? '')) && !['dismissed', 'archived'].includes(plan.status));
+
+  const count=pendingRuns.length+pendingPlans.length;
+  return <main className="page"><p className="eyebrow">Planner</p><h1>{history?'Requests':'Saved & suggested'}</h1>{history ? <>{planner.clarifications.filter(item=>item.state==='answered').map(item=><ClarificationCard key={item.id} clarification={item}/>)}    <details className="card"><summary>Your requests</summary><p>Private requests are retained for seven days.</p>{planner.runs.map((run) => <Request key={run.id} run={run} />)}</details>
+</> : <>    <details className="decisions"><summary>All pending suggestions {count > 0 && <span className="badge">{count}</span>}</summary><p className="muted">Requests stay here for seven days. Save an item to keep it longer.</p>{!count && <p>Nothing waiting right now.</p>}{(all ? pendingRuns : pendingRuns.slice(0, 5)).map((run) => <Request key={run.id} run={run} />)}{(all ? pendingPlans : pendingPlans.slice(0, Math.max(0, 5 - pendingRuns.length))).map((plan) => <section className="card" key={plan.id}><PlanCard plan={plan} /></section>)}{count > 5 && <button className="secondary" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${count}`}</button>}</details>
+    {saved.some((plan) => scheduleStart(plan.facts.time, planner.timezone)?.isValid && !inRange(plan.facts.time)) && <details className="card"><summary>Other saved plans</summary>{saved.filter((plan) => scheduleStart(plan.facts.time, planner.timezone)?.isValid && !inRange(plan.facts.time)).map((plan) => <PlanCard key={plan.id} plan={plan} />)}</details>}
+    {saved.some((plan) => !scheduleStart(plan.facts.time, planner.timezone)?.isValid) && <details className="card"><summary>Kept without a date</summary>{saved.filter((plan) => !scheduleStart(plan.facts.time, planner.timezone)?.isValid).map((plan) => <PlanCard key={plan.id} plan={plan} />)}</details>}
+    {planner.reminders.some((item) => item.state === 'active') && <section className="card"><h2>Reminders</h2>{planner.reminders.filter((item) => item.state === 'active').map((item) => <article key={item.id}><p>{item.title ?? planner.plans.find((plan) => plan.id === item.parentId)?.facts.title ?? planner.todos.find((todo) => todo.id === item.parentId)?.title ?? 'Household reminder'} · {DateTime.fromISO(item.dueAt, { zone: planner.timezone }).toFormat('ccc, LLL d · h:mm a')}</p><div className="button-row">{[{ label: 'Remind me in 15 minutes', fields: { snoozeUntil: DateTime.now().plus({ minutes: 15 }).toUTC().toISO() } }, { label: 'Done', fields: { completed: true } }, { label: 'Cancel reminder', fields: { canceled: true } }].map((choice) => <button key={choice.label} className="secondary" disabled={planner.busy} onClick={() => void planner.act(() => apiFetch(`/reminders/${item.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedRevision: item.revision, ...choice.fields }) }))}>{choice.label}</button>)}</div></article>)}</section>}
+</>}</main>;
+}
+
+export function RequestDetail() {
+  const planner = usePlanner(); const { id } = useParams();
+  const run = planner.runs.find((entry) => entry.id === id);
+  return <main className="page"><Link to="/">Back to Home</Link><h1>Your request</h1>
+    {!planner.loaded ? <p>Loading…</p> : run ? <><p className="preserve-lines">{run.text || 'Photo or PDF'}</p><Request run={run} expanded /></> : <p>This request is unavailable. Requests expire after seven days; saved items remain on Home.</p>}
+  </main>;
+}

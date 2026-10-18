@@ -1,0 +1,26 @@
+import Database from 'better-sqlite3';
+import { expect, it } from 'vitest';
+import { createApp } from '../app.js';
+import { migrate } from '../db/migrate.js';
+it('requires Access/session/CSRF, scopes settings to the actor, and rejects stale or extra fields', async () => {
+  const db = new Database(':memory:'); migrate(db);
+  const members = ['a','b'].map((id) => ({ id, householdId: 'h', accessSubject: id, displayName: id, timezone: 'America/New_York', active: true }));
+  db.prepare('INSERT INTO households (id, created_at) VALUES (?, ?)').run('h', new Date().toISOString());
+  for (const m of members) db.prepare('INSERT INTO members (id, household_id, access_subject, display_name, timezone, active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)').run(m.id, 'h', m.id, m.id, m.timezone, new Date().toISOString());
+  const config = { NODE_ENV: 'test' as const, DATABASE_PATH: ':memory:', SESSION_SECRET: 'test-session-secret-change-me-1234567890', APP_ORIGIN: 'https://planner.example.test' };
+  const app = createApp({ db, config, members: () => members, verifyAccess: async (token) => members.some((m) => m.id === token) ? { subject: token } : null });
+  const path = '/dashboard/api/v1/morning-digest';
+  expect((await app.request(path)).status).toBe(401);
+  const bootstrap = await app.request('/dashboard/api/v1/session', { method: 'POST', headers: { Authorization: 'Bearer a', Origin: config.APP_ORIGIN, 'X-Planner-Bootstrap': '1' } });
+  const csrf = (await bootstrap.json()).data.csrfToken;
+  const headers = { Authorization: 'Bearer a', Cookie: bootstrap.headers.get('set-cookie')!, Origin: config.APP_ORIGIN, 'Content-Type': 'application/json' };
+  const body = { enabled: false, localTime: '08:00', expectedRevision: 0 };
+  expect((await app.request(path, { method: 'POST', headers, body: JSON.stringify(body) })).status).toBe(403);
+  const authorized = { ...headers, 'X-CSRF-Token': csrf };
+  expect((await app.request(path, { method: 'POST', headers: authorized, body: JSON.stringify({ ...body, memberId: 'b' }) })).status).toBe(400);
+  expect((await app.request(path, { method: 'POST', headers: authorized, body: JSON.stringify(body) })).status).toBe(200);
+  expect(db.prepare('SELECT member_id FROM digest_settings').all()).toEqual([{ member_id: 'a' }]);
+  expect((await app.request(path, { method: 'POST', headers: authorized, body: JSON.stringify(body) })).status).toBe(409);
+  const response = await app.request(path, { headers }); expect(response.headers.get('cache-control')).toBe('no-store');
+  expect((await response.json()).data).toMatchObject({ revision: 1, localTime: '08:00' });
+});

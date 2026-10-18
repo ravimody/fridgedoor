@@ -1,0 +1,67 @@
+name: Docker image
+# Publishes only tested code:
+# - main: after CI passes for a push to main, as `main` and `sha-<short>` of the tested commit.
+# - a `v*` tag: after the CI suite passes for the tagged commit (run here, as a tag push doesn't run CI),
+#   as `latest`, the semver tags (1.2.3, 1.2, 1) and `sha-<short>`.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  ci:
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/ci.yml
+  image:
+    needs: ci
+    # `always()` so main builds still run when the tag-only `ci` job is skipped. A workflow_run from a pull
+    # request (even a fork's branch named main) never publishes: only CI for a push to this repository's main.
+    if: >-
+      always() && (
+        (github.event_name == 'push' && needs.ci.result == 'success') ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - id: source
+        env: { SHA: '${{ github.event.workflow_run.head_sha || github.sha }}' }
+        run: |
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "short=${SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with: { ref: '${{ steps.source.outputs.sha }}' }
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with: { registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}' }
+      - id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
+          # The semver patterns only match on tag pushes.
+          tags: |
+            type=raw,value=main,enable=${{ github.event_name == 'workflow_run' }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=sha-${{ steps.source.outputs.short }}
+          labels: org.opencontainers.image.revision=${{ steps.source.outputs.sha }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

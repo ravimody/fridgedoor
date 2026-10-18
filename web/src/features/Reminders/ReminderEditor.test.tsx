@@ -1,0 +1,21 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, expect, it, vi } from 'vitest';
+import { apiFetch } from '../../api/client.js';
+import { ReminderEditor } from './ReminderEditor.js';
+vi.mock('../../api/client.js', () => ({ apiFetch: vi.fn() }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+it('creates a personal reminder and reuses its identity after a lost response', async () => {
+  vi.mocked(apiFetch).mockRejectedValueOnce(new Error('NETWORK')).mockResolvedValueOnce({ data: {} });
+  render(<MemoryRouter><ReminderEditor parentType="list_item" parentId="item" /></MemoryRouter>);
+  fireEvent.click(screen.getByText('Remind me'));
+  fireEvent.change(screen.getByLabelText('Reminder time'), { target: { value: '2030-01-01T09:00' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save reminder' }));
+  await screen.findByText(/Could not save/);
+  fireEvent.click(screen.getByRole('button', { name: 'Save reminder' }));
+  await screen.findByText(/Reminder saved for you/);
+  const calls = vi.mocked(apiFetch).mock.calls;
+  expect(calls[0]![1]!.headers).toEqual(calls[1]![1]!.headers);
+  expect(JSON.parse(calls[0]![1]!.body as string)).toMatchObject({ parentType: 'list_item', parentId: 'item' });
+  await waitFor(() => expect(calls).toHaveLength(2));
+});
