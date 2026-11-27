@@ -16,7 +16,7 @@ func performRequestAction(_ app: AppModel, _ work: () async throws -> Void) asyn
         if error.isStale { await app.store?.refresh() }
         return false
     } catch {
-        app.show(error.localizedDescription, isError: true)
+        app.show(PlannerError.userMessage(for: error), isError: true)
         return false
     }
 }

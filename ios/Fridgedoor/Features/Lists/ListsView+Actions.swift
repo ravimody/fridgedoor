@@ -70,7 +70,7 @@ extension ListsView {
                 addedTick += 1
             } catch {
                 errorTick += 1
-                let reason = ListCopy.message(for: error) ?? (error as? PlannerError)?.userMessage ?? error.localizedDescription
+                let reason = ListCopy.message(for: error) ?? PlannerError.userMessage(for: error)
                 app.show("Couldn't add “\(pending.title)”. \(reason)", action: Toast.Action(label: "Retry") {
                     add(pending)
                 }, isError: true)

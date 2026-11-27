@@ -115,7 +115,7 @@ enum PlanErrorCopy {
         if let error = error as? PlanCalendarError {
             return "Your corrections are saved, but the calendar change couldn't be queued. \(message(for: error.underlying))"
         }
-        guard let error = error as? PlannerError else { return error.localizedDescription }
+        guard let error = error as? PlannerError else { return PlannerError.userMessage(for: error) }
         switch error.code {
         case "STALE_REVISION": return "This plan changed elsewhere. It's been refreshed — check it and try again."
         case "PLAN_TIME_INCOMPLETE": return "Add a start and end (or make it all day) before adding it to the calendar."

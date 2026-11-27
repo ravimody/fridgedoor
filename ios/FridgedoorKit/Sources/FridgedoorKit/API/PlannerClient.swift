@@ -71,7 +71,30 @@ public struct PlannerError: Error, LocalizedError, Equatable, Sendable {
         case "SERVER_UNREACHABLE": "Couldn't reach that server. Check the address, and that this iPhone is on the same network or VPN as the server."
         case "INSECURE_CONNECTION_BLOCKED": "iOS blocked the unencrypted connection to that address. Use the server's https address instead."
         case "CERTIFICATE_PROBLEM": "The server's security certificate isn't valid, so this iPhone won't connect. Check the server's https setup."
-        default: status >= 500 ? "The planner server had a problem. Try again shortly." : "Something went wrong (\(code.replacingOccurrences(of: "_", with: " ").lowercased()))."
+        default:
+            // Never show a raw code: fall back on what the status says happened.
+            switch status {
+            case 500...: "The planner server had a problem. Try again shortly."
+            case 401: "Your session ended. Sign in again to continue."
+            case 403: "You don't have access to that."
+            case 404: "That item is no longer available."
+            case 409: "This changed on another device. Pull to refresh and try again."
+            case 413: "That's too large to send."
+            case 429: "Too many requests right now. Try again in a little while."
+            default: "That didn't work. Try again, or pull to refresh first."
+            }
+        }
+    }
+
+    /// Plain copy for any error a screen catches: a `PlannerError`'s own message, and
+    /// something readable (never a system string) for anything else.
+    public static func userMessage(for error: Error) -> String {
+        switch error {
+        case let error as PlannerError: error.userMessage
+        case let error as URLError: (PlannerClient.mapped(error) as? PlannerError)?.userMessage ?? "That was cancelled."
+        case is CancellationError: "That was cancelled."
+        case let error as LocalizedError where error.errorDescription != nil: error.errorDescription ?? ""
+        default: "Something went wrong. Try again."
         }
     }
 }
@@ -385,7 +408,17 @@ public final class PlannerClient: Sendable {
 
     static func perform(_ request: URLRequest, using session: URLSession) async throws -> (Data, URLResponse) {
         do { return try await session.data(for: request) }
-        catch let error as URLError { throw PlannerError.transport(error) ?? error }
+        catch let error as URLError { throw mapped(error) }
+    }
+
+    /// Every URL error becomes a `PlannerError` with plain copy, except a cancellation,
+    /// which callers check for and ignore.
+    static func mapped(_ error: URLError) -> Error {
+        if error.code == .cancelled { return error }
+        if let transport = PlannerError.transport(error) { return transport }
+        let connection = PlannerError.connection(error)
+        // "Check the address" is advice for setup; a signed-in request reached this server before.
+        return connection == .serverUnreachable ? PlannerError.serverDown : connection
     }
 
     static func check(data: Data, response: URLResponse) throws {

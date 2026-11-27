@@ -305,7 +305,7 @@ final class AppModel {
     }
 
     func show(_ error: Error) {
-        let message = (error as? PlannerError)?.userMessage ?? error.localizedDescription
+        let message = PlannerError.userMessage(for: error)
         show(message, isError: true)
         if let error = error as? PlannerError, error.isStale { Task { await store?.refresh() } }
     }

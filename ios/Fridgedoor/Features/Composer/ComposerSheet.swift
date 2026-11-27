@@ -152,7 +152,7 @@ struct ComposerSheet: View {
                 enabling = true
                 Task {
                     do { try await store.setAssistantEnabled(true); composer.notice = nil; focused = true }
-                    catch { composer.notice = (error as? PlannerError)?.assistantMessage ?? error.localizedDescription }
+                    catch { composer.notice = (error as? PlannerError)?.assistantMessage ?? PlannerError.userMessage(for: error) }
                     enabling = false
                 }
             } label: {
