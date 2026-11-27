@@ -152,7 +152,9 @@ app. Everything else works.
   scheduled from server state after each refresh and in background refresh. Each can
   be turned off per iPhone (Settings → Notifications), for example to avoid double
   alerts with a Web Push subscription on the same phone. Activity notifications only
-  use Web Push.
+  use Web Push. The morning alert skips days with nothing on the calendar and no
+  decisions waiting. A pending alert whose text or time changed is replaced, and the
+  app keeps at most 60 pending (the soonest), under iOS's limit of 64.
 - Operator details (server, AI provider and limits, sync counts, Gmail label ids) are
   in Settings → Help & diagnostics, not on the everyday pages.
 - Google consent happens in the browser: Settings opens the web app's Settings →

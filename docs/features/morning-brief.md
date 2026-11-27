@@ -143,6 +143,7 @@ your morning notification setting (7:00 if none is saved). It's controlled by
 doesn't follow the web setting's on/off switch. The alert says how many things are on
 today, names the first shared item and its time, and counts open decisions, for
 example "3 things today. First: Soccer practice at 5:30 PM. 1 decision waiting."
+On a day with nothing on the calendar and no decisions waiting, there is no alert.
 With iOS previews hidden, the lock screen shows a placeholder instead.
 
 The iPhone app also offers **Evening look-ahead**, off by default: an alert at 8:00
