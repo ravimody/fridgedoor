@@ -50,7 +50,14 @@ enum BackgroundWork {
         }
     }
 
-    @MainActor private final class Assertion {
+    /// Starts a background task that `end()` (or running out of time) finishes.
+    static func begin(_ name: String) -> Assertion {
+        let assertion = Assertion()
+        assertion.id = UIApplication.shared.beginBackgroundTask(withName: name) { assertion.end() }
+        return assertion
+    }
+
+    @MainActor final class Assertion {
         var id = UIBackgroundTaskIdentifier.invalid
         func end() {
             guard id != .invalid else { return }

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 public enum HTTPMethod: String, Sendable { case get = "GET", post = "POST", put = "PUT", patch = "PATCH", delete = "DELETE" }
 
@@ -112,6 +113,13 @@ public actor AuthSession {
         }
     }
 
+    /// Begins work the system should let finish if the app leaves the foreground, and returns
+    /// the call that ends it. The iPhone app sets this to a UIKit background task; extensions
+    /// and the watch leave it unset.
+    public typealias BackgroundActivity = @Sendable (_ name: String) async -> @Sendable () async -> Void
+    private static let backgroundActivity = Mutex<BackgroundActivity?>(nil)
+    public static func setBackgroundActivity(_ activity: BackgroundActivity?) { backgroundActivity.withLock { $0 = activity } }
+
     /// The one session per server for this process. The app UI, App Intents,
     /// notification actions and background refresh must share it: two instances
     /// refreshing the same rotating token would revoke the whole session.
@@ -202,14 +210,25 @@ public actor AuthSession {
         let startedGeneration = generation
         let task = Task { [weak self] () throws -> Credentials in
             guard let self else { throw PlannerError.signedOut }
-            return try await self.tokenRequest(["grantType": "refresh_token", "refreshToken": refreshToken]).credentials
+            // The server rotates the refresh token as soon as it answers. If iOS suspended the
+            // app before the reply was stored, the next launch would present a used token and
+            // the server would revoke the whole session.
+            let end = await Self.backgroundActivity.withLock { $0 }?("Refresh session")
+            do {
+                let next = try await self.tokenRequest(["grantType": "refresh_token", "refreshToken": refreshToken]).credentials
+                await self.storeIfCurrent(next, generation: startedGeneration)
+                await end?()
+                return next
+            } catch {
+                await end?()
+                throw error
+            }
         }
         refreshTask = task
         defer { refreshTask = nil }
         do {
             let next = try await task.value
             guard generation == startedGeneration else { throw PlannerError.signedOut }
-            store(next)
             return next
         } catch let error as PlannerError where error.code == "NATIVE_GRANT_INVALID" || error.status == 401 {
             if generation == startedGeneration { signOutLocally(expired: true) }
@@ -242,6 +261,13 @@ public actor AuthSession {
         keychainIsStale = false
         keychain.set(nil, for: account)
         if wasSignedIn { onSignOut?(expired) }
+    }
+
+    /// Stores refreshed tokens inside the refresh task, so they are saved even if the
+    /// caller waiting on it was cancelled.
+    private func storeIfCurrent(_ next: Credentials, generation started: Int) {
+        guard generation == started else { return }
+        store(next)
     }
 
     /// Keeps `next` in memory even if the Keychain write fails (the session still works
