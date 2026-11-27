@@ -59,7 +59,9 @@ extension PlannerStore {
     func commitDismissal(_ id: String, app: AppModel?) async {
         guard let plan = pendingDismissals[id], !committingDismissals.contains(id) else { return }
         committingDismissals.insert(id)
-        dismissalTimers.removeValue(forKey: id)?.cancel()
+        // Dropped, not cancelled: this may be running inside that timer, and cancelling it
+        // would cancel the request below. A timer that fires later finds nothing to send.
+        dismissalTimers[id] = nil
         defer { committingDismissals.remove(id); pendingDismissals[id] = nil }
         do {
             _ = try await client.dismissPlan(plan.id, expectedRevision: plan.revision)
