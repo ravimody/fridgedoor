@@ -81,10 +81,34 @@ final class AppModel {
             return
         }
         #endif
-        guard let serverURL else { launchSignedOut(); return }
-        let auth = AuthSession.shared(for: serverURL)
-        guard let member = await auth.member else { launchSignedOut(); return }
-        await start(auth: auth, member: member)
+        // Before the first unlock after a restart, the Keychain (and the App Group's settings)
+        // can't be read yet. That isn't a sign-out: wait for the unlock, then look again.
+        while true {
+            if let serverURL {
+                let auth = AuthSession.shared(for: serverURL)
+                if let member = await auth.member { await start(auth: auth, member: member); return }
+                guard await auth.credentialsUnavailable else { break }
+            } else if let stored = SharedContainer.serverURL {
+                serverURL = stored
+                continue
+            } else if UIApplication.shared.isProtectedDataAvailable {
+                break
+            }
+            await Self.protectedDataDidBecomeAvailable()
+        }
+        launchSignedOut()
+    }
+
+    /// Returns at the next unlock, or after 30 seconds in case the unlock came just before waiting.
+    private static func protectedDataDidBecomeAvailable() async {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                for await _ in NotificationCenter.default.notifications(named: UIApplication.protectedDataDidBecomeAvailableNotification) { return }
+            }
+            group.addTask { try? await Task.sleep(for: .seconds(30)) }
+            await group.next()
+            group.cancelAll()
+        }
     }
 
     /// No session to resume (it may have ended while the app wasn't running): the Share
@@ -156,6 +180,15 @@ final class AppModel {
 
     func signOut() async {
         store?.stopPolling()
+        // Dismissals held for Undo would otherwise be lost with the session. Bounded like the
+        // Share credential revoke, so signing out offline isn't held up.
+        if let store, !store.pendingDismissals.isEmpty {
+            dismissToast()
+            let flush = Task { await store.flushPendingDismissals() }
+            let timeout = Task { try? await Task.sleep(for: .seconds(5)); flush.cancel() }
+            await flush.value
+            timeout.cancel()
+        }
         await PlatformIntegration.willSignOut(self)
         await client?.auth.signOut()
         didSignOut(expired: false)
@@ -272,7 +305,7 @@ final class AppModel {
     }
 
     func show(_ error: Error) {
-        let message = (error as? PlannerError)?.userMessage ?? error.localizedDescription
+        let message = PlannerError.userMessage(for: error)
         show(message, isError: true)
         if let error = error as? PlannerError, error.isStale { Task { await store?.refresh() } }
     }

@@ -13,6 +13,8 @@ final class PlannerStore {
     private(set) var household: [HouseholdPerson] = []
     /// Plans dismissed locally whose server request waits out the Undo window (`dismissWithUndo`).
     var pendingDismissals: [String: PlanSummary] = [:]
+    /// One Undo-window timer per held dismissal, cancelled by Undo or an early send.
+    var dismissalTimers: [String: Task<Void, Never>] = [:]
     /// Held dismissals whose request is in flight; they can no longer be undone or re-sent.
     var committingDismissals: Set<String> = []
 
@@ -62,6 +64,9 @@ final class PlannerStore {
     /// local edit touched that part since it was requested.
     private var partGeneration: [Part: Int] = [:]
     private var refreshesInFlight = 0
+    /// When the last refresh of every part started, so `startPolling` right after launch
+    /// (or right after a full refresh) doesn't fetch everything a second time.
+    private var fullRefreshStartedAt: Date?
 
     /// Called after each refresh (widget snapshot, local notification schedule).
     var didRefresh: (@MainActor (PlannerStore) -> Void)?
@@ -84,6 +89,7 @@ final class PlannerStore {
     func refresh(_ parts: Set<Part> = Set(Part.allCases)) async {
         var requested: [Part: Int] = [:]
         for part in parts { partGeneration[part, default: 0] += 1; requested[part] = partGeneration[part] }
+        if parts.count == Part.allCases.count { fullRefreshStartedAt = .now }
         refreshesInFlight += 1
         isRefreshing = true
         defer { refreshesInFlight -= 1; isRefreshing = refreshesInFlight > 0 }
@@ -206,8 +212,11 @@ final class PlannerStore {
     func startPolling() {
         guard !(pollsRegularly && pollTask != nil) else { return }
         pollsRegularly = true
-        restartPolling(after: .zero, parts: Set(Part.allCases))
+        let justRefreshed = fullRefreshStartedAt.map { Date.now.timeIntervalSince($0) < 15 } ?? false
+        restartPolling(after: justRefreshed ? Self.pollInterval : .zero, parts: Set(Part.allCases))
     }
+
+    private static let pollInterval: Duration = .seconds(45)
 
     func stopPolling() {
         pollsRegularly = false
@@ -253,7 +262,7 @@ final class PlannerStore {
                 pollingWork = false
                 parts = pollsRegularly ? Set(Part.allCases) : Self.workResultParts; delay = .zero
             } else if pollsRegularly {
-                parts = Set(Part.allCases); delay = .seconds(45)
+                parts = Set(Part.allCases); delay = Self.pollInterval
             } else {
                 return
             }

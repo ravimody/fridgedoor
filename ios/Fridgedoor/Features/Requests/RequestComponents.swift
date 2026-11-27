@@ -16,7 +16,7 @@ func performRequestAction(_ app: AppModel, _ work: () async throws -> Void) asyn
         if error.isStale { await app.store?.refresh() }
         return false
     } catch {
-        app.show(error.localizedDescription, isError: true)
+        app.show(PlannerError.userMessage(for: error), isError: true)
         return false
     }
 }
@@ -427,7 +427,7 @@ struct ProposedItemCard: View {
             Menu {
                 Button("Edit", systemImage: "pencil") { editorAddsTime = false; editing = true }
                 Divider()
-                Button("Dismiss", systemImage: "eye.slash", role: .destructive) { decide(.dismiss) }
+                Button("Dismiss", systemImage: "eye.slash") { decide(.dismiss) }
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.body.weight(.semibold))
@@ -595,7 +595,7 @@ struct KnowledgeChangeCard: View {
                     if busy { ProgressView() }
                     Spacer(minLength: 0)
                     Menu {
-                        Button("Dismiss", systemImage: "eye.slash", role: .destructive) { decide(.dismiss) }
+                        Button("Dismiss", systemImage: "eye.slash") { decide(.dismiss) }
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.body.weight(.semibold))

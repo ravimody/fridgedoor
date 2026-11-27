@@ -144,7 +144,7 @@ struct ComposerSheet: View {
     private var consentCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Turn on Ask the planner").font(.serif(.title2)).foregroundStyle(Color.ink)
-            Text("Your messages, uploads, relevant plans and lists, and approved remembered facts are sent to your household's AI provider. Public lookups send minimal search terms. Requests and results expire after seven days; remembered facts stay until removed. The provider may keep API data for a while under its own policy. Voice is transcribed on this iPhone when it can; otherwise the recording is sent through the planner to the provider for transcription, and the planner doesn't keep it. This does not enable email scanning.")
+            Text("Your messages, uploads, relevant plans and lists, and your household facts are sent to your household's AI provider. Public lookups send minimal search terms. Requests and results expire after seven days; household facts stay until you delete them. The provider may keep API data for a while under its own policy. Voice is transcribed on this iPhone when it can; otherwise the recording is sent through the planner to the provider for transcription, and the planner doesn't keep it. This does not enable email scanning.")
                 .font(.subheadline)
                 .foregroundStyle(Color.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -152,7 +152,7 @@ struct ComposerSheet: View {
                 enabling = true
                 Task {
                     do { try await store.setAssistantEnabled(true); composer.notice = nil; focused = true }
-                    catch { composer.notice = (error as? PlannerError)?.assistantMessage ?? error.localizedDescription }
+                    catch { composer.notice = (error as? PlannerError)?.assistantMessage ?? PlannerError.userMessage(for: error) }
                     enabling = false
                 }
             } label: {
@@ -374,6 +374,9 @@ struct FlowChips: View {
                         .padding(.vertical, 8)
                         .frame(minHeight: 36)
                         .background(Color.soft, in: .capsule)
+                        // Looks 36pt tall, takes taps across 44pt.
+                        .padding(.vertical, 4)
+                        .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
             }

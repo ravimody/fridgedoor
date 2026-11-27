@@ -157,7 +157,11 @@ struct ErrorBanner: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "exclamationmark.triangle").foregroundStyle(Color.warning)
             Text(message).font(.subheadline).foregroundStyle(Color.ink).frame(maxWidth: .infinity, alignment: .leading)
-            if let retry { Button("Retry", action: retry).font(.subheadline.weight(.semibold)) }
+            if let retry {
+                Button(action: retry) { Text("Retry").frame(minWidth: 44, minHeight: 44).contentShape(.rect) }
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.vertical, -12)
+            }
         }
         .plannerCard(.soft, padding: 12)
     }

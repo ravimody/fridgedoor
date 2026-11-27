@@ -84,7 +84,7 @@ struct ListWidgetView: View {
                 } else if list == .todo {
                     // To-dos need their full title and due label: one column.
                     let shown = Array(rows.prefix(undo == nil ? 4 : 3))
-                    ForEach(shown) { CheckRow(row: $0, list: list, compact: true) }
+                    ForEach(shown) { CheckRow(row: $0, list: list, compact: true, titleLines: 2) }
                     Spacer(minLength: 0)
                     if let undo { UndoBar(checked: undo, list: list) } else if rows.count > shown.count { more(rows.count - shown.count) }
                 } else {

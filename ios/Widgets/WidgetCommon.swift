@@ -69,6 +69,9 @@ struct CheckRow: View {
     let list: ListKind
     var showsDetail = true
     var compact = false
+    /// Two in medium and large families: a long title wraps instead of being cut off, and
+    /// shrinks back to one line when the widget runs out of room.
+    var titleLines = 1
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -86,7 +89,7 @@ struct CheckRow: View {
                     Text(row.title)
                         .font(compact ? .footnote : .subheadline)
                         .foregroundStyle(Color.ink)
-                        .lineLimit(1)
+                        .lineLimit(titleLines)
                     Spacer(minLength: 0)
                     if let assignee = row.assignee {
                         Text(assignee)

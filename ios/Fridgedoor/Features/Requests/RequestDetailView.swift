@@ -132,7 +132,7 @@ struct RequestDetailView: View {
                     Link(destination: url) {
                         Label(url.host() ?? url.absoluteString, systemImage: "safari")
                             .font(.subheadline)
-                            .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }
                     .foregroundStyle(Color.plannerAccent)
                 }
@@ -176,11 +176,6 @@ struct RequestDetailView: View {
         DisclosureGroup(isExpanded: $showDetails) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(run.text.isEmpty ? "Photo or PDF" : run.text).font(.footnote).foregroundStyle(Color.ink).textSelection(.enabled)
-                Text("Run \(run.id)").font(.caption.monospaced()).foregroundStyle(Color.muted).textSelection(.enabled)
-                if let metrics = run.metrics {
-                    Text("\(metrics.model) · \((Double(metrics.durationMs) / 1000).formatted(.number.precision(.fractionLength(1))))s")
-                        .font(.caption).foregroundStyle(Color.muted)
-                }
                 Button("Delete request", systemImage: "trash", role: .destructive) { confirmDelete = true }
                     .buttonStyle(PlannerButtonStyle(kind: .destructive, size: .small))
                     .disabled(busy)

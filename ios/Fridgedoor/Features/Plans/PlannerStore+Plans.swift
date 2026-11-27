@@ -37,8 +37,10 @@ extension PlannerStore {
         invalidateInFlightRefresh([.plans])
         plans.removeAll { $0.id == plan.id }
         app.show("Dismissed “\(plan.effectiveFacts.title)”.", action: Toast.Action(label: "Undo") { [weak self, weak app] in self?.undoDismissal(plan.id, app: app) })
-        Task { [weak self] in
+        dismissalTimers[plan.id]?.cancel()
+        dismissalTimers[plan.id] = Task { [weak self, weak app] in
             try? await Task.sleep(for: Toast.undoWindow + .seconds(1))
+            guard !Task.isCancelled else { return }
             await self?.commitDismissal(plan.id, app: app)
         }
     }
@@ -49,12 +51,17 @@ extension PlannerStore {
             app?.show("Already dismissed. You can find it under Plans → Dismissed.")
             return
         }
+        // A later dismissal of the same plan gets its own full Undo window.
+        dismissalTimers.removeValue(forKey: id)?.cancel()
         replace(plan)
     }
 
     func commitDismissal(_ id: String, app: AppModel?) async {
         guard let plan = pendingDismissals[id], !committingDismissals.contains(id) else { return }
         committingDismissals.insert(id)
+        // Dropped, not cancelled: this may be running inside that timer, and cancelling it
+        // would cancel the request below. A timer that fires later finds nothing to send.
+        dismissalTimers[id] = nil
         defer { committingDismissals.remove(id); pendingDismissals[id] = nil }
         do {
             _ = try await client.dismissPlan(plan.id, expectedRevision: plan.revision)
@@ -65,7 +72,7 @@ extension PlannerStore {
         }
     }
 
-    /// Sends any held dismissals now (the app is going to the background).
+    /// Sends any held dismissals now (the app is going to the background, or signing out).
     func flushPendingDismissals() async {
         for id in Array(pendingDismissals.keys) { await commitDismissal(id, app: nil) }
     }
@@ -110,7 +117,7 @@ enum PlanErrorCopy {
         if let error = error as? PlanCalendarError {
             return "Your corrections are saved, but the calendar change couldn't be queued. \(message(for: error.underlying))"
         }
-        guard let error = error as? PlannerError else { return error.localizedDescription }
+        guard let error = error as? PlannerError else { return PlannerError.userMessage(for: error) }
         switch error.code {
         case "STALE_REVISION": return "This plan changed elsewhere. It's been refreshed — check it and try again."
         case "PLAN_TIME_INCOMPLETE": return "Add a start and end (or make it all day) before adding it to the calendar."

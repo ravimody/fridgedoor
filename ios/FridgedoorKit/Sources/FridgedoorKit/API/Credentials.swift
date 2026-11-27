@@ -23,12 +23,35 @@ struct TokenResponse: Decodable, Sendable {
     var credentials: Credentials { Credentials(accessToken: accessToken, accessTokenExpiresAt: accessTokenExpiresAt, refreshToken: refreshToken, refreshTokenExpiresAt: refreshTokenExpiresAt, member: member) }
 }
 
+/// The result of a Keychain read. `locked` means the item may exist but can't be read until
+/// the phone is unlocked for the first time since it restarted. Any other failure (a missing
+/// entitlement, a damaged item) won't fix itself, so it's `failed`.
+public enum KeychainRead: Equatable, Sendable {
+    case found(Data)
+    case absent
+    case locked
+    case failed(OSStatus)
+
+    init(status: OSStatus, result: CFTypeRef?) {
+        switch status {
+        case errSecSuccess: self = (result as? Data).map(KeychainRead.found) ?? .absent
+        case errSecItemNotFound: self = .absent
+        case errSecInteractionNotAllowed: self = .locked
+        default: self = .failed(status)
+        }
+    }
+
+    public var data: Data? { if case .found(let data) = self { data } else { nil } }
+}
+
 /// Generic-password Keychain storage. `accessGroup == nil` keeps an item in the
 /// app's own group; the shared group is only for the capture-only credential
 /// the Share extension needs — never the app's session tokens.
 public struct KeychainStore: Sendable {
     public let service: String
     public let accessGroup: String?
+    /// Replaces real Keychain reads in tests.
+    var readOverride: (@Sendable (String) -> KeychainRead)?
 
     public init(service: String = "dev.fridgedoor", accessGroup: String? = nil) {
         self.service = service; self.accessGroup = accessGroup
@@ -40,13 +63,18 @@ public struct KeychainStore: Sendable {
         return query
     }
 
-    public func data(_ account: String) -> Data? {
+    /// Reads an item, telling "not there" apart from "can't be read yet" (before first unlock).
+    public func read(_ account: String) -> KeychainRead {
+        if let readOverride { return readOverride(account) }
         var query = query(account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
-        return SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess ? result as? Data : nil
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        return KeychainRead(status: status, result: result)
     }
+
+    public func data(_ account: String) -> Data? { read(account).data }
 
     /// Stores `data` (nil deletes it). An existing item is updated in place, so a failed
     /// write leaves the previous value rather than nothing. Returns the Keychain status.

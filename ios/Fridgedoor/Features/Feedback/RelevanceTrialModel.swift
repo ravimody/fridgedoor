@@ -43,9 +43,15 @@ final class RelevanceTrialModel {
         }
     }
 
-    /// Returns nil on success, or the message to show.
-    func rate(_ item: TrialItem, _ vote: TrialVote, reason: String) async -> String? {
-        guard !busy else { return nil }
+    enum RateOutcome: Equatable {
+        case saved
+        /// Another request was still running, so nothing was sent.
+        case ignored
+        case failed(String)
+    }
+
+    func rate(_ item: TrialItem, _ vote: TrialVote, reason: String) async -> RateOutcome {
+        guard !busy else { return .ignored }
         busy = true
         defer { busy = false }
         do {
@@ -53,13 +59,13 @@ final class RelevanceTrialModel {
             changingId = nil
             summary = nil // the server discards the draft when ratings change
             learning = try? await client.trialLearning()
-            return nil
+            return .saved
         } catch {
             if (error as? PlannerError)?.isStale == true {
                 await load()
-                return "This answer changed on another device. It's been refreshed."
+                return .failed("This answer changed on another device. It's been refreshed.")
             }
-            return message(error, fallback: "Couldn't save. Your answer is still here; try again.")
+            return .failed(message(error, fallback: "Couldn't save. Your answer is still here; try again."))
         }
     }
 
@@ -121,7 +127,7 @@ final class RelevanceTrialModel {
             learning = (try? await client.trialLearning()) ?? TrialLearning(enabled: false, revision: 0, preferences: [], generatedAt: nil)
             return nil
         } catch {
-            return message(error, fallback: "Couldn't delete the trial. Try again.")
+            return message(error, fallback: "Couldn't delete your ratings. Try again.")
         }
     }
 

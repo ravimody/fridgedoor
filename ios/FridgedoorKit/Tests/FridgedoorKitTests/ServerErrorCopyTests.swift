@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import FridgedoorKit
 
@@ -23,5 +24,29 @@ import Testing
         let error = PlannerError(code: "CAPTURE_TOO_LARGE", status: 413)
         #expect(error.assistantMessage == "Choose a photo or PDF smaller than 10 MB.")
         #expect(error.captureMessage == "That's too large to send (10 MB limit).")
+    }
+}
+
+/// No raw server code or system string reaches the screen.
+@Suite struct FallbackErrorCopyTests {
+    @Test func unknownCodesUsePlainCopy() {
+        #expect(PlannerError(code: "PLAN_TIME_INCOMPLETE", status: 400).userMessage == "That didn't work. Try again, or pull to refresh first.")
+        #expect(PlannerError(code: "SOMETHING_NEW", status: 429).userMessage == "Too many requests right now. Try again in a little while.")
+        #expect(!PlannerError(code: "SOMETHING_NEW", status: 400).userMessage.contains("something new"))
+    }
+
+    @Test func urlErrorsAreMapped() {
+        #expect(PlannerClient.mapped(URLError(.badServerResponse)) as? PlannerError == .serverDown)
+        #expect(PlannerClient.mapped(URLError(.serverCertificateUntrusted)) as? PlannerError == .certificateProblem)
+        #expect(PlannerClient.mapped(URLError(.notConnectedToInternet)) as? PlannerError == .offline)
+        #expect((PlannerClient.mapped(URLError(.cancelled)) as? URLError)?.code == .cancelled)
+        #expect(PlannerError.userMessage(for: URLError(.badServerResponse)) == PlannerError.serverDown.userMessage)
+    }
+
+    @Test func emptyRecordingIsNotCalledTooLong() {
+        let empty = PlannerError(code: "INVALID_AUDIO", status: 413, serverMessage: "invalid audio")
+        let tooBig = PlannerError(code: "INVALID_AUDIO", status: 413, serverMessage: "That recording is too long.")
+        #expect(empty.assistantMessage == "That recording couldn't be used. Try again or type instead.")
+        #expect(tooBig.assistantMessage == "That recording is too long. Keep voice requests under two minutes.")
     }
 }

@@ -30,8 +30,9 @@ enum PlatformSync {
             return store.refreshError == nil
         }
         guard let client = await PlatformSession.client() else {
-            // Signed out (possibly expired while the UI wasn't running).
-            await clearLocalState()
+            // Signed out (possibly expired while the UI wasn't running). Before the first
+            // unlock the session just can't be read yet: keep everything until it can.
+            if await !PlatformSession.isLockedOut() { await clearLocalState() }
             return false
         }
         do {
@@ -40,7 +41,7 @@ enum PlatformSync {
             await waitForIdle()
             return true
         } catch {
-            if (error as? PlannerError)?.code == PlannerError.signedOut.code { await clearLocalState() }
+            if (error as? PlannerError)?.code == PlannerError.signedOut.code, await !PlatformSession.isLockedOut() { await clearLocalState() }
             return false
         }
     }

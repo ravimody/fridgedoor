@@ -17,6 +17,12 @@ enum PlatformIntegration {
     static let spotlightActivityType = CSSearchableItemActionType
 
     static func didFinishLaunching() {
+        // A token refresh in flight when the app is backgrounded gets time to store the new tokens.
+        AuthSession.setBackgroundActivity { name in
+            let assertion = await BackgroundWork.begin(name)
+            return { await assertion.end() }
+        }
+        FileSink.removeLeftovers()
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
         NotificationScheduler.registerCategories()
         BackgroundRefresh.register()

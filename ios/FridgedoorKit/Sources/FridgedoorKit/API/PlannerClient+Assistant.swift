@@ -103,10 +103,13 @@ public extension PlannerError {
         case "PDF_PAGE_COUNT_UNAVAILABLE", "UNSUPPORTED_OR_CORRUPT_FILE": "That file couldn't be read. Use a JPEG, PNG or PDF."
         case "CAPTURE_IDEMPOTENCY_CONFLICT", "IDEMPOTENCY_CONFLICT": "That request was already sent with different details. Try again."
         case "ASSISTANT_BUSY": "Several requests are waiting. Let them finish, then send this one."
-        case "KNOWLEDGE_LIMIT": "There are 50 remembered facts. Edit or forget an existing fact before adding another."
+        case "KNOWLEDGE_LIMIT": "You have 50 household facts. Edit or forget one before adding another."
         case "INPUT_REQUIRED", "CAPTURE_INPUT_REQUIRED": "Type a message or attach a photo or PDF."
         case "INPUT_TOO_LONG", "CAPTURE_TEXT_TOO_LONG": "That message is too long (8,000 characters)."
-        case "INVALID_AUDIO": status == 413 ? "That recording is too long. Keep voice requests under two minutes." : "That recording couldn't be used. Try again or type instead."
+        // The server answers 413 for every unusable recording (empty, wrong type or too big);
+        // only its upload size limit says "too long".
+        case "INVALID_AUDIO": serverMessage?.localizedCaseInsensitiveContains("too long") == true
+            ? "That recording is too long. Keep voice requests under two minutes." : "That recording couldn't be used. Try again or type instead."
         case "TRANSCRIPTION_FAILED": "Couldn't transcribe that. Try again or type instead."
         case "RESULT_PARTIALLY_REVIEWED": "Some items were already reviewed. Review the rest one at a time."
         case "RESULT_NOT_READY": "This request is still being worked on."

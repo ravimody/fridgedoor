@@ -310,7 +310,7 @@ struct PlanDetailView: View {
         let when = reminder.due.map { "\(TimeLabels.relativeDay($0, in: zone)) · \(TimeLabels.time($0, in: zone))" } ?? "Reminder"
         return PlanFactRow(systemImage: "bell", text: when, secondary: reminder.offsetMinutes.map { "\(ReminderText.offsetLabel($0)) · moves with the plan" }) {
             Menu {
-                Button("Snooze 15 minutes", systemImage: "moon.zzz") {
+                Button("Remind me in 15 minutes", systemImage: "bell") {
                     reminderAction { try await store.snoozeReminder(reminder, until: .now.addingTimeInterval(15 * 60)) }
                 }
                 Button("Done", systemImage: "checkmark") { reminderAction { try await store.completeReminder(reminder) } }

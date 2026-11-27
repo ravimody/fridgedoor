@@ -152,13 +152,18 @@ app. Everything else works.
   scheduled from server state after each refresh and in background refresh. Each can
   be turned off per iPhone (Settings → Notifications), for example to avoid double
   alerts with a Web Push subscription on the same phone. Activity notifications only
-  use Web Push.
-- Operator details (server, AI provider and limits, sync counts, Gmail label ids) are
-  in Settings → Help & diagnostics, not on the everyday pages.
+  use Web Push. The morning alert skips days with nothing on the calendar and no
+  decisions waiting. A pending alert whose text or time changed is replaced, and the
+  app keeps at most 60 pending (the soonest), under iOS's limit of 64.
+- Operator details (server, AI provider and limits, sync counts, Gmail label ids,
+  recent request ids and models) are in Settings → Help & diagnostics, not on the
+  everyday pages.
 - Google consent happens in the browser: Settings opens the web app's Settings →
   Email page in an in-app Safari sheet.
 - The Share extension uses its own capture-only credential (`/capture/v1`), created
-  at sign-in and revoked at sign-out. It can't read plans.
+  at sign-in, re-created when the app comes to the foreground (checked at most hourly)
+  or after Delete my private data if it was revoked, and revoked at sign-out. It
+  can't read plans.
 - Voice uses on-device speech when available and falls back to server transcription.
 - Widget buttons run their intents in the app's process (`LiveActivityIntent`, see
   `Platform/Intents/WidgetIntents.swift`), launched in the background if needed, with

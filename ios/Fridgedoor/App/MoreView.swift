@@ -19,6 +19,8 @@ struct MoreView: View {
                     .padding(.vertical, 4)
                     .accessibilityElement(children: .combine)
                 }
+            } footer: {
+                Text("Signed in to \(ServerAddress.Normalized.displayName(for: store.client.baseURL)).")
             }
             .plannerRows()
             Section {
@@ -31,12 +33,6 @@ struct MoreView: View {
                     Label("Household facts", systemImage: "books.vertical")
                         .badge(store.knowledgeProposals.filter { $0.status == "pending" }.count)
                 }
-            }
-            .plannerRows()
-            Section {
-                NavigationLink(value: Route.settings) { Label("Settings", systemImage: "gearshape") }
-            } footer: {
-                Text("Signed in to \(ServerAddress.Normalized.displayName(for: store.client.baseURL)).")
             }
             .plannerRows()
         }

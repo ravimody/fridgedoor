@@ -245,7 +245,10 @@ private struct TrialContent: View {
 
     private func rate(_ item: TrialItem, _ vote: TrialVote, _ reason: String) async -> Bool {
         let wasChanging = model.changingId != nil
-        if let error = await model.rate(item, vote, reason: reason) {
+        switch await model.rate(item, vote, reason: reason) {
+        case .saved: break
+        case .ignored: return false
+        case .failed(let error):
             app.show(error, isError: true)
             return false
         }

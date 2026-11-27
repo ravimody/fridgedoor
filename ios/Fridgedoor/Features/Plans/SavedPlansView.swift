@@ -214,7 +214,7 @@ struct SavedPlansView: View {
         }
         .swipeActions(edge: .trailing) {
             Button("Cancel reminder", systemImage: "bell.slash", role: .destructive) { reminderAction { try await store.cancelReminder(reminder) } }
-            Button("Snooze 15 minutes", systemImage: "moon.zzz") {
+            Button("Remind me in 15 minutes", systemImage: "bell") {
                 reminderAction { try await store.snoozeReminder(reminder, until: .now.addingTimeInterval(15 * 60)) }
             }
             .tint(Color.warning)

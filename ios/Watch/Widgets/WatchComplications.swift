@@ -12,6 +12,8 @@ struct WatchEntry: TimelineEntry {
     var snapshot: WidgetSnapshot? { payload?.snapshot }
     var next: WidgetSnapshot.Entry? { snapshot?.remaining(at: date).first }
     var decisions: Int { payload?.decisionCount ?? 0 }
+    /// The iPhone hasn't sent anything for hours, so this may be out of date.
+    var isStale: Bool { snapshot?.isStale(at: date) ?? false }
 }
 
 struct WatchProvider: TimelineProvider {
@@ -23,9 +25,15 @@ struct WatchProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<WatchEntry>) -> Void) {
         let payload = WatchPayload.stored()
-        // Change as events end and at midnight, like the iPhone's Today widget.
-        let dates = payload?.snapshot.timelineDates(from: .now) ?? [.now]
-        completion(Timeline(entries: dates.map { WatchEntry(date: $0, payload: payload) }, policy: .never))
+        let now = Date.now
+        // Change as events end and at midnight, like the iPhone's Today widget, and when the
+        // data turns stale. Reload hourly in case a newer payload arrived without a reload.
+        var dates = Set(payload?.snapshot.timelineDates(from: now) ?? [now])
+        if let generated = payload?.snapshot.generatedAt {
+            let stale = generated.addingTimeInterval(6 * 3600 + 1)
+            if stale > now { dates.insert(stale) }
+        }
+        completion(Timeline(entries: dates.sorted().map { WatchEntry(date: $0, payload: payload) }, policy: .after(now.addingTimeInterval(3600))))
     }
 }
 
@@ -51,7 +59,7 @@ struct WatchComplicationView: View {
                     .widgetAccentable()
                 Text(next.title)
                     .font(.body)
-                    .lineLimit(entry.decisions > 0 ? 1 : 2)
+                    .lineLimit(entry.decisions > 0 || entry.isStale ? 1 : 2)
                     .privacySensitive(next.isPrivate == true)
             } else {
                 Text("Fridgedoor").font(.headline).widgetAccentable()
@@ -59,7 +67,11 @@ struct WatchComplicationView: View {
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
-            if entry.decisions > 0 {
+            if entry.isStale {
+                Label("Open iPhone to update", systemImage: "exclamationmark.arrow.circlepath")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if entry.decisions > 0 {
                 Label(entry.decisions == 1 ? "1 decision" : "\(entry.decisions) decisions", systemImage: "questionmark.bubble")
                     .font(.footnote)
                     .foregroundStyle(.secondary)

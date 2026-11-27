@@ -21,7 +21,7 @@ One word per concept, everywhere: app, widgets, notifications, Siri phrases.
 | Delete something you own | **Delete** | Remove |
 | Stop notifications on a device | **Turn off** | Remove |
 | Push a to-do to another day | **Later** (moon icon) → "Back Sat" | Remind me later, snooze |
-| A personal alert | **Remind me** (bell) | |
+| A personal alert | **Remind me** (bell); pushing one back is **Remind me in 15 minutes** | Snooze |
 | Something asked of the assistant | **Request** / **Requests** | Conversation |
 | Facts the assistant remembers | **Household facts** | Household knowledge, memory |
 | A to-do item | **to-do** (tab: **To do**) | task, todo |
@@ -81,8 +81,8 @@ Copy rules:
   edits. Use the `.medium` detent for one-question sheets and `.large` for editors.
 - Swipes mirror the first context-menu items. Lists: leading Done; trailing Later,
   Assign/Move, Delete. Suggestions: leading Save; trailing Dismiss. Tints follow the
-  action: accent for Done, amber for Later/Snooze, red only for Delete, neutral for
-  Dismiss.
+  action: accent for Done, amber for Later and Remind me in 15 minutes, red only for
+  Delete, neutral for Dismiss.
 - One symbol per concept: `moon.zzz` Later, `bell` Remind me, `eye.slash` Dismiss (`xmark` only
   closes), `basket` Groceries, `sparkles` Ask the planner, `mappin.and.ellipse` places,
   `calendar.badge.plus` Add to calendar, `square.and.arrow.up.on.square` Apple Calendar export.

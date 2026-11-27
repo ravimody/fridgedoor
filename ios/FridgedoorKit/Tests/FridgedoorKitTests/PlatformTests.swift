@@ -130,10 +130,42 @@ import Testing
     }
 
     @Test func digestsUseMemberTimezoneAndSkipPastTimes() {
-        let digests = PlatformNotificationPlan.digests(hour: 7, minute: 0, timeZone: zone, now: now, days: 3)
+        let digests = PlatformNotificationPlan.digests(hour: 7, minute: 0, timeZone: zone, now: now, days: 3, decisions: 1)
         #expect(digests.map(\.identifier) == ["digest.2026-10-11.0700", "digest.2026-10-12.0700", "digest.2026-10-13.0700"])
         #expect(digests[0].fireDate == PlannerDates.instant("2026-10-11T07:00:00-04:00"))
         #expect(digests[0].link == "fridgedoor://home")
+    }
+
+    @Test func morningAlertSkipsDaysWithNothingOnThem() throws {
+        let agenda = try decode([AgendaItem].self, #"""
+        [{"id":"a3","planId":"p2","title":"Picture day","time":{"kind":"all_day","startDate":"2026-10-12","endDateExclusive":"2026-10-13"},"location":null,"status":"confirmed","visibility":"shared","origin":"household calendar"}]
+        """#)
+        let digests = PlatformNotificationPlan.digests(hour: 7, minute: 0, timeZone: zone, now: now, days: 3, agenda: agenda, decisions: 0)
+        #expect(digests.map(\.identifier) == ["digest.2026-10-12.0700"])
+    }
+
+    func alert(_ id: String, _ body: String, at offset: TimeInterval) -> PlatformNotification {
+        PlatformNotification(identifier: id, fireDate: now.addingTimeInterval(offset), title: "Good morning", body: body, category: .digest, link: "fridgedoor://home", reminderId: nil, revision: nil)
+    }
+
+    @Test func reconcileReplacesAlertsWhoseTextOrTimeChanged() {
+        let desired = [alert("same", "1 thing today.", at: 60), alert("text", "2 things today.", at: 120), alert("time", "1 thing today.", at: 180), alert("new", "1 thing today.", at: 240)]
+        let pending = [
+            PendingNotification(identifier: "same", title: "Good morning", body: "1 thing today.", fireDate: now.addingTimeInterval(60)),
+            PendingNotification(identifier: "text", title: "Good morning", body: "1 thing today.", fireDate: now.addingTimeInterval(120)),
+            PendingNotification(identifier: "time", title: "Good morning", body: "1 thing today.", fireDate: now.addingTimeInterval(999)),
+            PendingNotification(identifier: "legacy", title: "Good morning", body: "1 thing today.", fireDate: nil),
+        ]
+        let changes = PlatformNotificationPlan.changes(pending: pending, desired: desired)
+        #expect(Set(changes.remove) == ["text", "time", "legacy"])
+        #expect(changes.add.map(\.identifier) == ["text", "time", "new"])
+    }
+
+    @Test func capKeepsTheSoonestAlerts() {
+        let many = (0..<70).reversed().map { alert("a\($0)", "x", at: TimeInterval($0) * 60) }
+        let capped = PlatformNotificationPlan.capped(many)
+        #expect(capped.count == PlatformNotificationPlan.pendingLimit)
+        #expect(capped.first?.identifier == "a0" && capped.last?.identifier == "a59")
     }
 
     @Test func morningAndEveningAlertsSayWhatTheDayHoldsWithoutNamingPrivateItems() throws {

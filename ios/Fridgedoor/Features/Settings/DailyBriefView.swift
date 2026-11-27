@@ -28,8 +28,8 @@ struct DailyBriefView: View {
 
     /// The full disclosure the switch accepts. Shown verbatim under "Read more".
     static let disclosure = [
-        "The planner can prepare a short private overview for Home using your current plans, calendar context, reminders, recent permitted source metadata and confirmed private facts. It doesn't create events, send messages or mark tasks complete.",
-        "When enabled, this also permits scheduled maintenance suggestions for household knowledge. AI processing is off until you turn it on here. Results are encrypted and kept for one week; usage records contain metadata only and are kept for up to 30 days.",
+        "The planner can prepare a short private morning brief for Home using your current plans, calendar context, reminders, recent permitted source metadata, and your household facts, including ones you haven't confirmed yet. It doesn't create events, send messages or mark to-dos done.",
+        "When enabled, this also permits scheduled maintenance suggestions for household facts. AI processing is off until you turn it on here. Results are encrypted and kept for one week; usage records contain metadata only and are kept for up to 30 days.",
     ]
 
     var body: some View {
@@ -64,7 +64,7 @@ struct DailyBriefView: View {
         Section {
             SettingsSummary(points: [
                 .init("sun.horizon", "The planner writes a short summary of your day for Home."),
-                .init("tray.full", "It reads your plans, calendar, reminders, recent email details and confirmed household facts."),
+                .init("tray.full", "It reads your plans, calendar, reminders, recent email details and household facts, including unconfirmed ones."),
                 .init("hand.raised", "It never creates events, sends messages or completes to-dos."),
             ], details: Self.disclosure)
             if let settings = store.dailySettings {
@@ -97,7 +97,9 @@ struct DailyBriefView: View {
         aiBusy = true
         defer { aiBusy = false; pendingAi = nil }
         do {
-            store.dailySettings = try await store.client.setDailySettings(enabled: enabled, expectedRevision: settings.revision, consentVersion: settings.disclosureVersion)
+            let saved = try await store.client.setDailySettings(enabled: enabled, expectedRevision: settings.revision, consentVersion: settings.disclosureVersion)
+            store.invalidateInFlightRefresh([.dailySettings])
+            store.dailySettings = saved
             changed += 1
             app.show(enabled ? "Morning brief turned on." : "Morning brief turned off.")
             await store.refresh([.dailyOverview])
@@ -119,12 +121,15 @@ struct DailyBriefView: View {
                 .disabled(digestBusy || (!(digest.available ?? false) && !digest.enabled))
                 DatePicker("Time", selection: Binding(get: { time }, set: { time = $0; scheduleSave(enabled: pendingDigest ?? digest.enabled, delay: .milliseconds(900)) }), displayedComponents: .hourAndMinute)
                     .environment(\.timeZone, store.timeZone)
-                    .disabled(!digest.enabled && pendingDigest != true)
+                    // The time also sets this iPhone's own morning alert, so it can change while the
+                    // web notification is off. The server refuses a time change only for an enabled
+                    // notification it can't deliver.
+                    .disabled((pendingDigest ?? digest.enabled) && !(digest.available ?? false))
                 if !(digest.available ?? false) {
                     SettingsNotice(text: digest.enabled ? "Morning delivery isn't set up on the server, so the time can't change right now. You can still turn it off." : "Morning delivery isn't set up on the server yet, so it can't be turned on.", tone: .warning)
                 }
             } footer: {
-                Text("A notification when your brief is ready; it opens Home. Times are in \(settingsTimeZoneName(store.timeZone, fallback: digest.timezone)). Choose which devices alert in Notifications.")
+                Text("A notification when your brief is ready; it opens Home. The time also sets this iPhone's morning alert. Times are in \(settingsTimeZoneName(store.timeZone, fallback: digest.timezone)). Choose which devices alert in Notifications.")
             }
             .plannerRows()
         } else {
@@ -167,7 +172,8 @@ struct DailyBriefView: View {
             PlatformPreferences.shared.serverDigest = saved
             PlatformSync.resync()
             changed += 1
-            app.show(enabled ? "Morning notification set for \(localTimeLabel(localTime, in: store.timeZone))." : "Morning notification turned off.")
+            let label = localTimeLabel(localTime, in: store.timeZone)
+            app.show(enabled ? "Morning notification set for \(label)." : enabled != digest.enabled ? "Morning notification turned off." : "Morning time set to \(label).")
         } catch {
             queued = nil
             if !(error is CancellationError || (error as? URLError)?.code == .cancelled) {

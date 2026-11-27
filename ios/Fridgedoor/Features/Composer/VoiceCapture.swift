@@ -303,4 +303,14 @@ final class FileSink: SpeechSink, @unchecked Sendable {
 
     func finish() async -> (text: String, interrupted: Bool) { ("", false) }
     func cancel() async { discard() }
+
+    /// Deletes recordings left behind when the app was killed mid-recording. Called at
+    /// launch, before any recording can start.
+    static func removeLeftovers() {
+        let directory = FileManager.default.temporaryDirectory
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path())) ?? []
+        for name in names where name.hasPrefix("voice-") && name.hasSuffix(".m4a") {
+            try? FileManager.default.removeItem(at: directory.appending(path: name))
+        }
+    }
 }

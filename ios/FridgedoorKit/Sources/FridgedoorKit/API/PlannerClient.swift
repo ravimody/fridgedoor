@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 public enum HTTPMethod: String, Sendable { case get = "GET", post = "POST", put = "PUT", patch = "PATCH", delete = "DELETE" }
 
@@ -10,6 +11,8 @@ public struct PlannerError: Error, LocalizedError, Equatable, Sendable {
     public init(code: String, status: Int = 0, serverMessage: String? = nil) { self.code = code; self.status = status; self.serverMessage = serverMessage }
 
     public static let signedOut = PlannerError(code: "SIGNED_OUT", status: 401)
+    /// The session is in the Keychain but can't be read until the phone is unlocked.
+    public static let sessionLocked = PlannerError(code: "SESSION_LOCKED")
     public static let offline = PlannerError(code: "OFFLINE")
     public static let serverDown = PlannerError(code: "SERVER_DOWN")
     public static let decoding = PlannerError(code: "UNEXPECTED_RESPONSE")
@@ -35,6 +38,7 @@ public struct PlannerError: Error, LocalizedError, Equatable, Sendable {
     public var userMessage: String {
         switch code {
         case "SIGNED_OUT", "UNAUTHENTICATED", "NATIVE_GRANT_INVALID": "Your session ended. Sign in again to continue."
+        case "SESSION_LOCKED": "Unlock your iPhone, then try again."
         case "OFFLINE": "You're offline. Check your connection and try again."
         case "SERVER_DOWN": "Can't reach the Fridgedoor server. It may be down, or only reachable at home or over a VPN. Try again in a minute."
         case "PAIRING_CODE_USED": "This code was already used. Make a new one in Settings → iPhone on the web."
@@ -67,7 +71,30 @@ public struct PlannerError: Error, LocalizedError, Equatable, Sendable {
         case "SERVER_UNREACHABLE": "Couldn't reach that server. Check the address, and that this iPhone is on the same network or VPN as the server."
         case "INSECURE_CONNECTION_BLOCKED": "iOS blocked the unencrypted connection to that address. Use the server's https address instead."
         case "CERTIFICATE_PROBLEM": "The server's security certificate isn't valid, so this iPhone won't connect. Check the server's https setup."
-        default: status >= 500 ? "The planner server had a problem. Try again shortly." : "Something went wrong (\(code.replacingOccurrences(of: "_", with: " ").lowercased()))."
+        default:
+            // Never show a raw code: fall back on what the status says happened.
+            switch status {
+            case 500...: "The planner server had a problem. Try again shortly."
+            case 401: "Your session ended. Sign in again to continue."
+            case 403: "You don't have access to that."
+            case 404: "That item is no longer available."
+            case 409: "This changed on another device. Pull to refresh and try again."
+            case 413: "That's too large to send."
+            case 429: "Too many requests right now. Try again in a little while."
+            default: "That didn't work. Try again, or pull to refresh first."
+            }
+        }
+    }
+
+    /// Plain copy for any error a screen catches: a `PlannerError`'s own message, and
+    /// something readable (never a system string) for anything else.
+    public static func userMessage(for error: Error) -> String {
+        switch error {
+        case let error as PlannerError: error.userMessage
+        case let error as URLError: (PlannerClient.mapped(error) as? PlannerError)?.userMessage ?? "That was cancelled."
+        case is CancellationError: "That was cancelled."
+        case let error as LocalizedError where error.errorDescription != nil: error.errorDescription ?? ""
+        default: "Something went wrong. Try again."
         }
     }
 }
@@ -81,6 +108,9 @@ public actor AuthSession {
     private let keychain: KeychainStore
     private let urlSession: URLSession
     private var credentials: Credentials?
+    /// The last Keychain read failed because the phone hasn't been unlocked since it
+    /// restarted: the person may still be signed in, so this is not a sign-out.
+    private var keychainUnreadable = false
     private var refreshTask: Task<Credentials, Error>?
     /// Bumped on every sign-out so a refresh already in flight can't write tokens back.
     private var generation = 0
@@ -106,6 +136,13 @@ public actor AuthSession {
         }
     }
 
+    /// Begins work the system should let finish if the app leaves the foreground, and returns
+    /// the call that ends it. The iPhone app sets this to a UIKit background task; extensions
+    /// and the watch leave it unset.
+    public typealias BackgroundActivity = @Sendable (_ name: String) async -> @Sendable () async -> Void
+    private static let backgroundActivity = Mutex<BackgroundActivity?>(nil)
+    public static func setBackgroundActivity(_ activity: BackgroundActivity?) { backgroundActivity.withLock { $0 = activity } }
+
     /// The one session per server for this process. The app UI, App Intents,
     /// notification actions and background refresh must share it: two instances
     /// refreshing the same rotating token would revoke the whole session.
@@ -113,14 +150,35 @@ public actor AuthSession {
 
     public init(baseURL: URL, keychain: KeychainStore = KeychainStore(), urlSession: URLSession = .shared) {
         self.baseURL = baseURL; self.keychain = keychain; self.urlSession = urlSession
-        self.account = Self.account(for: baseURL)
-        self.credentials = keychain.value(Credentials.self, for: account)
+        let account = Self.account(for: baseURL)
+        self.account = account
+        let read = keychain.read(account)
+        self.credentials = read.data.flatMap { try? JSONDecoder().decode(Credentials.self, from: $0) }
+        keychainUnreadable = read == .locked
     }
 
     static func account(for baseURL: URL) -> String { "native-session \(baseURL.absoluteString)" }
 
-    public var member: Member? { credentials?.member }
-    public var isSignedIn: Bool { credentials != nil }
+    public var member: Member? { loadFromKeychainIfNeeded(); return credentials?.member }
+    public var isSignedIn: Bool { loadFromKeychainIfNeeded(); return credentials != nil }
+    /// No session in memory because the Keychain couldn't be read yet (the phone hasn't
+    /// been unlocked since it restarted). Callers must not treat this as signed out.
+    public var credentialsUnavailable: Bool { loadFromKeychainIfNeeded(); return credentials == nil && keychainUnreadable }
+
+    /// Reads the Keychain while there are no credentials in memory, so a session that
+    /// couldn't be read before first unlock is picked up once it can be.
+    private func loadFromKeychainIfNeeded() {
+        guard credentials == nil else { return }
+        switch keychain.read(account) {
+        case .found(let data):
+            credentials = try? JSONDecoder().decode(Credentials.self, from: data)
+            keychainUnreadable = false
+        case .absent, .failed: keychainUnreadable = false
+        case .locked: keychainUnreadable = true
+        }
+    }
+
+    private var missingCredentialsError: PlannerError { keychainUnreadable ? .sessionLocked : .signedOut }
 
     /// `expired` is false only for an explicit `signOut()`.
     public func setSignOutHandler(_ handler: @escaping @Sendable (_ expired: Bool) -> Void) { onSignOut = handler }
@@ -148,7 +206,8 @@ public actor AuthSession {
 
     public func accessToken() async throws -> String {
         if let refreshTask { return try await refreshTask.value.accessToken }
-        guard let credentials else { throw PlannerError.signedOut }
+        loadFromKeychainIfNeeded()
+        guard let credentials else { throw missingCredentialsError }
         if credentials.accessExpiry.timeIntervalSinceNow > 60 { return credentials.accessToken }
         return try await refresh().accessToken
     }
@@ -156,7 +215,8 @@ public actor AuthSession {
     /// Refreshes unless another caller already did after `staleToken` was issued.
     public func refreshAfterRejection(of staleToken: String) async throws -> String {
         if let refreshTask { return try await refreshTask.value.accessToken }
-        guard let credentials else { throw PlannerError.signedOut }
+        loadFromKeychainIfNeeded()
+        guard let credentials else { throw missingCredentialsError }
         if credentials.accessToken != staleToken { return credentials.accessToken }
         return try await refresh().accessToken
     }
@@ -173,14 +233,25 @@ public actor AuthSession {
         let startedGeneration = generation
         let task = Task { [weak self] () throws -> Credentials in
             guard let self else { throw PlannerError.signedOut }
-            return try await self.tokenRequest(["grantType": "refresh_token", "refreshToken": refreshToken]).credentials
+            // The server rotates the refresh token as soon as it answers. If iOS suspended the
+            // app before the reply was stored, the next launch would present a used token and
+            // the server would revoke the whole session.
+            let end = await Self.backgroundActivity.withLock { $0 }?("Refresh session")
+            do {
+                let next = try await self.tokenRequest(["grantType": "refresh_token", "refreshToken": refreshToken]).credentials
+                await self.storeIfCurrent(next, generation: startedGeneration)
+                await end?()
+                return next
+            } catch {
+                await end?()
+                throw error
+            }
         }
         refreshTask = task
         defer { refreshTask = nil }
         do {
             let next = try await task.value
             guard generation == startedGeneration else { throw PlannerError.signedOut }
-            store(next)
             return next
         } catch let error as PlannerError where error.code == "NATIVE_GRANT_INVALID" || error.status == 401 {
             if generation == startedGeneration { signOutLocally(expired: true) }
@@ -213,6 +284,13 @@ public actor AuthSession {
         keychainIsStale = false
         keychain.set(nil, for: account)
         if wasSignedIn { onSignOut?(expired) }
+    }
+
+    /// Stores refreshed tokens inside the refresh task, so they are saved even if the
+    /// caller waiting on it was cancelled.
+    private func storeIfCurrent(_ next: Credentials, generation started: Int) {
+        guard generation == started else { return }
+        store(next)
     }
 
     /// Keeps `next` in memory even if the Keychain write fails (the session still works
@@ -330,7 +408,17 @@ public final class PlannerClient: Sendable {
 
     static func perform(_ request: URLRequest, using session: URLSession) async throws -> (Data, URLResponse) {
         do { return try await session.data(for: request) }
-        catch let error as URLError { throw PlannerError.transport(error) ?? error }
+        catch let error as URLError { throw mapped(error) }
+    }
+
+    /// Every URL error becomes a `PlannerError` with plain copy, except a cancellation,
+    /// which callers check for and ignore.
+    static func mapped(_ error: URLError) -> Error {
+        if error.code == .cancelled { return error }
+        if let transport = PlannerError.transport(error) { return transport }
+        let connection = PlannerError.connection(error)
+        // "Check the address" is advice for setup; a signed-in request reached this server before.
+        return connection == .serverUnreachable ? PlannerError.serverDown : connection
     }
 
     static func check(data: Data, response: URLResponse) throws {

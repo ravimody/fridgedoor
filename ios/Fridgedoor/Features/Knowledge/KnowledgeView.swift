@@ -217,7 +217,9 @@ struct KnowledgeView: View {
 
     private func disableAssistant() async {
         do {
-            store.assistantSettings = try await store.client.setAssistant(enabled: false)
+            let settings = try await store.client.setAssistant(enabled: false)
+            store.invalidateInFlightRefresh([.assistantSettings])
+            store.assistantSettings = settings
             app.show("Ask the planner is off for your account.")
         } catch {
             app.show(error)

@@ -14,6 +14,10 @@ struct EmailSuggestionsView: View {
     @State private var busy = false
     @State private var changed = 0
 
+    /// Google-specific wording only when Google is the connected mailbox (not IMAP or nothing).
+    private var isGoogle: Bool { store.connection.map { $0.isGoogle && $0.status != "disconnected" } ?? false }
+    private var syncName: String { isGoogle ? "Google sync" : "Email sync" }
+
     /// What the person agrees to when turning this on. Shown verbatim under "Read more"
     /// and in the consent sheet.
     static let disclosure = [
@@ -42,7 +46,7 @@ struct EmailSuggestionsView: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .disabled(busy)
                 } footer: {
-                    Text("Google sync keeps running; pause it in Google account.")
+                    Text("\(syncName) keeps running; pause it in Settings → Email.")
                 }
                 .plannerRows()
             }
@@ -59,7 +63,7 @@ struct EmailSuggestionsView: View {
         .confirmationDialog("Turn off email suggestions?", isPresented: $confirmOff, titleVisibility: .visible) {
             Button("Turn off", role: .destructive) { Task { await save(enabled: false) } }
         } message: {
-            Text("The planner stops reading new email, including emails waiting to be read. Saved suggestions stay, and Gmail sync keeps running.")
+            Text("The planner stops reading new email, including emails waiting to be read. Saved suggestions stay, and \(isGoogle ? "Gmail sync" : "email sync") keeps running.")
         }
     }
 
@@ -74,7 +78,7 @@ struct EmailSuggestionsView: View {
             if !status.available {
                 SettingsNotice(text: "Email suggestions aren't available on the server right now.", tone: .warning)
             } else if !status.connectionActive {
-                SettingsNotice(text: "Connect or resume Google to process email.", tone: .info)
+                SettingsNotice(text: isGoogle ? "Resume Google sync in Settings → Email to process email." : "Connect or resume your email in Settings → Email to process it.", tone: .info)
             }
             if status.enabled, status.pausedForVolume {
                 SettingsNotice(text: "Paused for a while because of unusually heavy email. It resumes on its own.", tone: .warning)
@@ -102,7 +106,7 @@ struct EmailSuggestionsView: View {
         do {
             model.backgroundAi = try await model.client.setBackgroundAi(enabled: enabled, expectedRevision: status.revision)
             changed += 1
-            app.show(enabled ? "Email suggestions are on." : "Email suggestions are off. Google sync keeps running.")
+            app.show(enabled ? "Email suggestions are on." : "Email suggestions are off. \(syncName) keeps running.")
         } catch {
             app.show(settingsErrorMessage(error, fallback: "Couldn't save. Check the current setting and try again."), isError: true)
             await model.load([.backgroundAi])

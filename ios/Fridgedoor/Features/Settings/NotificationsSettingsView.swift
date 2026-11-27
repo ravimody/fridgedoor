@@ -50,7 +50,7 @@ struct NotificationsSettingsView: View {
         .confirmationDialog("Turn off notifications for \(removing?.label ?? "this browser")?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }), titleVisibility: .visible, presenting: removing) { device in
             Button("Turn off", role: .destructive) { Task { await remove(device) } }
         } message: { _ in
-            Text("It stops receiving reminders and digests until it's enabled again from that browser.")
+            Text("It stops receiving reminders and the morning notification until it's turned on again from that browser.")
         }
     }
 

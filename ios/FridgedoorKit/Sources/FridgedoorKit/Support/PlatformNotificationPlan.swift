@@ -20,6 +20,18 @@ public struct PlatformNotification: Hashable, Sendable {
     }
 }
 
+/// A request iOS already has pending, as far as `PlatformNotificationPlan.changes` needs it.
+public struct PendingNotification: Hashable, Sendable {
+    public let identifier: String
+    public let title: String
+    public let body: String
+    /// When it was meant to fire; nil for requests scheduled by builds that didn't record it.
+    public let fireDate: Date?
+    public init(identifier: String, title: String, body: String, fireDate: Date?) {
+        self.identifier = identifier; self.title = title; self.body = body; self.fireDate = fireDate
+    }
+}
+
 /// Computes the local notification schedule from server data. The server stays
 /// the source of truth: identifiers are stable per reminder id + revision, so a
 /// snooze/edit elsewhere (new revision) replaces the old alert on the next sync.
@@ -29,6 +41,33 @@ public enum PlatformNotificationPlan {
     public static let eveningPrefix = "evening."
     /// iOS keeps at most 64 pending requests per app; leave room for digests and tests.
     public static let reminderLimit = 50
+    /// All scheduled alerts together stay under iOS's 64, leaving room for the test alert
+    /// and offline "Remind me in 15 minutes" fallbacks.
+    public static let pendingLimit = 60
+
+    /// The soonest `limit` alerts: iOS silently drops requests beyond its limit.
+    public static func capped(_ desired: [PlatformNotification], limit: Int = pendingLimit) -> [PlatformNotification] {
+        Array(desired.sorted { $0.fireDate < $1.fireDate }.prefix(limit))
+    }
+
+    /// What to remove from and add to the pending requests so they match `desired`. A
+    /// request whose identifier is still wanted is replaced when its text or time changed
+    /// (the day's count in a morning alert, a renamed plan), otherwise left alone.
+    public static func changes(pending: [PendingNotification], desired: [PlatformNotification]) -> (remove: [String], add: [PlatformNotification]) {
+        let wanted = Dictionary(desired.map { ($0.identifier, $0) }, uniquingKeysWith: { first, _ in first })
+        var remove: [String] = []
+        var current = Set<String>()
+        for request in pending {
+            if let next = wanted[request.identifier], next.title == request.title, next.body == request.body,
+               let fire = request.fireDate, abs(fire.timeIntervalSince(next.fireDate)) < 1 {
+                current.insert(request.identifier)
+            } else {
+                remove.append(request.identifier)
+            }
+        }
+        let add = desired.filter { !current.contains($0.identifier) }
+        return (remove, add)
+    }
 
     public static func reminderIdentifier(id: String, revision: Int) -> String { "\(reminderPrefix)\(id).r\(revision)" }
 
@@ -120,7 +159,7 @@ public enum PlatformNotificationPlan {
     private static func clock(_ date: Date, _ timeZone: TimeZone) -> String { date.formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: timeZone)) }
 
     /// "Good morning" at `hour:minute` member time for the next `days` days, saying what
-    /// the day holds. The time is part of the identifier so a new time replaces it.
+    /// the day holds. Days with nothing on the calendar and no decisions waiting are skipped. The time is part of the identifier so a new time replaces it.
     /// Concrete instants (not a repeating calendar trigger) so the alert follows the
     /// member's timezone even if the phone's differs or DST shifts.
     public static func digests(hour: Int, minute: Int, timeZone: TimeZone, now: Date = .now, days: Int = 7, agenda: [AgendaItem] = [], decisions: Int = 0) -> [PlatformNotification] {
@@ -129,7 +168,10 @@ public enum PlatformNotificationPlan {
         return (0...days).compactMap { offset -> PlatformNotification? in
             guard let day = calendar.date(byAdding: .day, value: offset, to: today),
                   let fire = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day), fire > now else { return nil }
-            let body = morningBody(outlook(for: day, agenda: agenda, timeZone: timeZone), decisions: decisions, timeZone: timeZone)
+            let outlook = outlook(for: day, agenda: agenda, timeZone: timeZone)
+            // Nothing on the calendar and nothing to decide: no reason to interrupt.
+            guard outlook.count > 0 || decisions > 0 else { return nil }
+            let body = morningBody(outlook, decisions: decisions, timeZone: timeZone)
             return PlatformNotification(identifier: "\(digestPrefix)\(PlannerDates.dayString(day, in: timeZone)).\(String(format: "%02d%02d", hour, minute))", fireDate: fire, title: "Good morning", body: body, category: .digest, link: "fridgedoor://home", reminderId: nil, revision: nil)
         }
         .prefix(days)

@@ -196,7 +196,7 @@ private struct DecisionRow: View {
         }
         if !item.isTask {
             Divider()
-            Button("Dismiss", systemImage: "eye.slash", role: .destructive) { dismiss() }
+            Button("Dismiss", systemImage: "eye.slash") { dismiss() }
         }
     }
 
@@ -260,7 +260,7 @@ private struct QuestionRow: View {
                     Spacer(minLength: 0)
                     if busy { ProgressView().controlSize(.small) }
                     Menu {
-                        Button("Dismiss question", systemImage: "eye.slash", role: .destructive) { home.dismiss(clarification) }
+                        Button("Dismiss question", systemImage: "eye.slash") { home.dismiss(clarification) }
                     } label: {
                         Image(systemName: "ellipsis")
                             .font(.body.weight(.semibold))
@@ -276,7 +276,7 @@ private struct QuestionRow: View {
         .padding(.vertical, 12)
         .background(Color.card)
         .contextMenu {
-            Button("Dismiss question", systemImage: "eye.slash", role: .destructive) { home.dismiss(clarification) }
+            Button("Dismiss question", systemImage: "eye.slash") { home.dismiss(clarification) }
         }
         .accessibilityAction(named: "Dismiss question") { home.dismiss(clarification) }
     }

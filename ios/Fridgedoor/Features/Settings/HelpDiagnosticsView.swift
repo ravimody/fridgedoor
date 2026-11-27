@@ -59,6 +59,22 @@ struct HelpDiagnosticsView: View {
                 .plannerRows()
             }
 
+            if !store.runs.isEmpty {
+                Section {
+                    ForEach(store.runs.prefix(5)) { run in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(run.id).font(.caption.monospaced()).foregroundStyle(Color.ink).textSelection(.enabled)
+                            Text(requestDiagnostics(run)).font(.caption).foregroundStyle(Color.muted)
+                        }
+                    }
+                } header: {
+                    Text("Recent requests")
+                } footer: {
+                    Text("Request ids and the AI model that answered, for whoever runs the server.")
+                }
+                .plannerRows()
+            }
+
             if let labels = model.policy?.excludedLabels, !labels.isEmpty {
                 Section {
                     ForEach(labels, id: \.self) { label in
@@ -78,10 +94,21 @@ struct HelpDiagnosticsView: View {
         .navigationTitle("Help & diagnostics")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
-            await store.refresh([.connection])
+            await store.refresh([.connection, .runs])
             await model.load([.backgroundAi, .calendars, .digest, .policy])
         }
         .fullScreenCover(item: $browser) { SafariView(url: $0.url).ignoresSafeArea() }
+    }
+
+    /// "Oct 10, 9:14 AM · succeeded · model-name · 2.3s"
+    private func requestDiagnostics(_ run: AssistantRun) -> String {
+        var parts = [settingsTimestamp(run.createdAt, in: store.timeZone) ?? run.createdAt, run.state]
+        if let code = run.errorCode { parts.append(code) }
+        if let metrics = run.metrics {
+            parts.append(metrics.model)
+            parts.append("\((Double(metrics.durationMs) / 1000).formatted(.number.precision(.fractionLength(1))))s")
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func emailSection(_ status: BackgroundAiStatus) -> some View {

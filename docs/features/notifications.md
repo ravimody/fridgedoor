@@ -20,7 +20,8 @@ keys on first start, so there's nothing to configure.
 In the app's **Settings → Notifications** there are three switches:
 
 - **Reminders**, on by default;
-- **Morning**, on by default (see [the morning brief](morning-brief.md#in-the-iphone-app));
+- **Morning**, on by default, on days with something on the calendar or a decision
+  waiting (see [the morning brief](morning-brief.md#in-the-iphone-app));
 - **Evening look-ahead**, off by default: at 8:00 PM, on evenings when tomorrow has
   something on it.
 

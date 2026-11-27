@@ -156,7 +156,8 @@ On the server:
   Settings removes your requests, facts and private plans.
 - Server logs hold only the job, its duration and an error code. Each request also
   stores its model, token counts, duration and tool names, which request details
-  show along with a run ID. When reporting a problem, quote the run ID together with
+  show along with a run ID (in the iPhone app, Settings → Help & diagnostics → Recent
+  requests). When reporting a problem, quote the run ID together with
   a **Helpful** or **Needs work** rating, so whoever runs the server can investigate
   without reading private content.
 

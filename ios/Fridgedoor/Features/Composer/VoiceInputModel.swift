@@ -107,8 +107,10 @@ final class VoiceInputModel {
         phase = .listening
         watchdog = Task { [weak self] in
             try? await Task.sleep(for: Self.maxDuration)
-            guard !Task.isCancelled else { return }
-            await self?.finish()
+            guard !Task.isCancelled, let self else { return }
+            // A fresh task: finishing cancels this watchdog, which would also cancel the
+            // transcription upload and the send that follow.
+            Task { await self.finish() }
         }
         // A call, Siri or an alarm, a lost input device, or an engine reconfiguration
         // ends the recording; what was heard is kept for review instead of being sent.
@@ -242,9 +244,12 @@ final class VoiceInputModel {
     }
 
     private func stopForReview(on name: Notification.Name, object: AnyObject? = nil, when matches: @escaping @MainActor (Notification) -> Bool = { _ in true }) {
+        let notes = NotificationCenter.default.notifications(named: name, object: object)
         observers.append(Task { [weak self] in
-            for await note in NotificationCenter.default.notifications(named: name, object: object) where matches(note) {
-                await self?.stop(reviewOnly: true)
+            for await note in notes where matches(note) {
+                // A fresh task: stopping cancels this observer (see the watchdog).
+                guard let self else { return }
+                Task { await self.stop(reviewOnly: true) }
             }
         })
     }

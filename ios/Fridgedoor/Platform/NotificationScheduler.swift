@@ -17,7 +17,7 @@ enum NotificationScheduler {
     private static var center: UNUserNotificationCenter { .current() }
 
     static func registerCategories() {
-        let snooze = UNNotificationAction(identifier: Action.snooze, title: "Snooze 15 min", options: [], icon: UNNotificationActionIcon(systemImageName: "moon.zzz"))
+        let snooze = UNNotificationAction(identifier: Action.snooze, title: "Remind me in 15 minutes", options: [], icon: UNNotificationActionIcon(systemImageName: "bell"))
         let done = UNNotificationAction(identifier: Action.done, title: "Done", options: [.authenticationRequired], icon: UNNotificationActionIcon(systemImageName: "checkmark.circle"))
         // With iOS's default "Show Previews: When Unlocked", the Lock Screen shows
         // only these placeholders, never plan titles.
@@ -55,15 +55,18 @@ enum NotificationScheduler {
 
     // MARK: Reconcile
 
-    /// Makes the pending reminder/digest alerts match `desired`. Existing requests
-    /// with the same identifier are left alone; stale ones are removed. Delivered
-    /// alerts for reminders that are no longer active are cleared too.
+    /// Makes the pending reminder/digest alerts match `desired` (the soonest that fit under
+    /// iOS's limit). Requests with the same identifier, text and time are left alone; changed
+    /// and stale ones are replaced or removed. Delivered alerts for reminders that are no
+    /// longer active are cleared too.
     static func reconcile(_ desired: [PlatformNotification], activeReminderIds: Set<String>) async {
-        let managed = { (id: String) in id.hasPrefix(PlatformNotificationPlan.reminderPrefix) || id.hasPrefix(PlatformNotificationPlan.digestPrefix) || id.hasPrefix(PlatformNotificationPlan.eveningPrefix) }
-        let pending = Set(await center.pendingNotificationRequests().map(\.identifier).filter(managed))
-        let wanted = Set(desired.map(\.identifier))
-        let stale = pending.subtracting(wanted)
-        if !stale.isEmpty { center.removePendingNotificationRequests(withIdentifiers: Array(stale)) }
+        let desired = PlatformNotificationPlan.capped(desired)
+        let pending = await center.pendingNotificationRequests().filter { isManaged($0.identifier) }.map { request in
+            PendingNotification(identifier: request.identifier, title: request.content.title, body: request.content.body,
+                                fireDate: (request.content.userInfo["fireAt"] as? TimeInterval).map(Date.init(timeIntervalSince1970:)))
+        }
+        let changes = PlatformNotificationPlan.changes(pending: pending, desired: desired)
+        if !changes.remove.isEmpty { center.removePendingNotificationRequests(withIdentifiers: changes.remove) }
 
         let delivered = await center.deliveredNotifications().map(\.request)
         let finished = delivered.filter { request in
@@ -73,13 +76,16 @@ enum NotificationScheduler {
         if !finished.isEmpty { center.removeDeliveredNotifications(withIdentifiers: finished.map(\.identifier)) }
 
         guard canSchedule(await authorizationStatus()) else { return }
-        let added = desired.filter { !pending.contains($0.identifier) }
-        for notification in added {
+        for notification in changes.add {
             try? await center.add(request(for: notification))
         }
         #if DEBUG
-        if !added.isEmpty || !stale.isEmpty { await logPending() }
+        if !changes.add.isEmpty || !changes.remove.isEmpty { await logPending() }
         #endif
+    }
+
+    private static func isManaged(_ id: String) -> Bool {
+        id.hasPrefix(PlatformNotificationPlan.reminderPrefix) || id.hasPrefix(PlatformNotificationPlan.digestPrefix) || id.hasPrefix(PlatformNotificationPlan.eveningPrefix)
     }
 
     static func request(for notification: PlatformNotification, fireDate: Date? = nil, identifier: String? = nil) -> UNNotificationRequest {
@@ -93,15 +99,17 @@ enum NotificationScheduler {
         // Time Sensitive needs an entitlement the free developer team can't get.
         content.interruptionLevel = .active
         content.relevanceScore = notification.category == .reminder ? 0.8 : 0.5
-        var info: [String: Any] = ["link": notification.link]
+        let fireDate = fireDate ?? notification.fireDate
+        // The intended time, so a later reconcile can tell whether it changed.
+        var info: [String: Any] = ["link": notification.link, "fireAt": fireDate.timeIntervalSince1970]
         if let reminderId = notification.reminderId { info["reminderId"] = reminderId }
         if let revision = notification.revision { info["revision"] = revision }
         content.userInfo = info
-        let interval = max(1, (fireDate ?? notification.fireDate).timeIntervalSinceNow)
+        let interval = max(1, fireDate.timeIntervalSinceNow)
         return UNNotificationRequest(identifier: identifier ?? notification.identifier, content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false))
     }
 
-    /// Local fallback when a Snooze couldn't reach the server (offline). Outside the
+    /// Local fallback when "Remind me in 15 minutes" couldn't reach the server (offline). Outside the
     /// reconciled prefixes so the next sync doesn't remove it.
     static func scheduleLocalSnooze(title: String, body: String, link: URL?, reminderId: String) async {
         let notification = PlatformNotification(identifier: "snooze.\(reminderId)", fireDate: .now.addingTimeInterval(15 * 60), title: title, body: body, category: .reminder, link: link?.absoluteString ?? "fridgedoor://home", reminderId: reminderId, revision: nil)
@@ -139,7 +147,7 @@ enum NotificationScheduler {
     }
 
     static func pendingCount() async -> Int {
-        await center.pendingNotificationRequests().filter { $0.identifier.hasPrefix(PlatformNotificationPlan.reminderPrefix) || $0.identifier.hasPrefix(PlatformNotificationPlan.digestPrefix) || $0.identifier.hasPrefix(PlatformNotificationPlan.eveningPrefix) }.count
+        await center.pendingNotificationRequests().filter { isManaged($0.identifier) }.count
     }
 
     #if DEBUG
@@ -148,7 +156,8 @@ enum NotificationScheduler {
         print("[Platform] \(requests.count) pending notifications")
         for request in requests {
             let fire = (request.trigger as? UNTimeIntervalNotificationTrigger)?.nextTriggerDate()
-            print("[Platform]   \(request.identifier) @ \(fire.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? "?") — \(request.content.title) · \(request.content.body)")
+            // Identifiers and times only: titles and bodies can name private plans.
+            print("[Platform]   \(request.identifier) @ \(fire.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? "?")")
         }
     }
     #endif

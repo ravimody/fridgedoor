@@ -14,7 +14,7 @@ struct CalendarSettingsView: View {
         List {
             if store.connection?.status != "active" {
                 Section {
-                    EmptyState(systemImage: "calendar.badge.exclamationmark", title: "Google isn't syncing", message: store.connection?.status == "paused" ? "Resume sync in Google account to choose calendars." : "Connect Google first, then choose which calendars to read.")
+                    EmptyState(systemImage: "calendar.badge.exclamationmark", title: "Google isn't syncing", message: store.connection?.status == "paused" ? "Resume sync in Settings → Email to choose calendars." : "Connect Google in Settings → Email, then choose which calendars to read.")
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets())
                 }
@@ -181,7 +181,7 @@ private struct CalendarReadRow: View {
     private func errorText(_ error: String) -> String {
         switch error {
         case "reconnect": "Reconnect Google to resume syncing."
-        case "resyncing": "Refreshing calendar history. The worker will retry automatically."
+        case "resyncing": "Refreshing calendar history. It retries automatically."
         default: "Calendar sync failed. Retrying automatically; existing events may be out of date."
         }
     }

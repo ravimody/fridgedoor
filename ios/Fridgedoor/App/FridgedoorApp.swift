@@ -20,7 +20,10 @@ struct FridgedoorApp: App {
                 .onContinueUserActivity(PlatformIntegration.spotlightActivityType) { PlatformIntegration.continueActivity($0) }
                 .onChange(of: scenePhase) { _, phase in
                     guard let store = app.store else { return }
-                    if phase == .active { store.startPolling() } else if phase == .background {
+                    if phase == .active {
+                        store.startPolling()
+                        Task { await ShareCredentialManager.ensureIfDue(store.client) }
+                    } else if phase == .background {
                         store.stopPolling()
                         if !store.pendingDismissals.isEmpty {
                             // The held dismissals are sent now, so their Undo no longer applies.
@@ -50,7 +53,14 @@ enum BackgroundWork {
         }
     }
 
-    @MainActor private final class Assertion {
+    /// Starts a background task that `end()` (or running out of time) finishes.
+    static func begin(_ name: String) -> Assertion {
+        let assertion = Assertion()
+        assertion.id = UIApplication.shared.beginBackgroundTask(withName: name) { assertion.end() }
+        return assertion
+    }
+
+    @MainActor final class Assertion {
         var id = UIBackgroundTaskIdentifier.invalid
         func end() {
             guard id != .invalid else { return }
