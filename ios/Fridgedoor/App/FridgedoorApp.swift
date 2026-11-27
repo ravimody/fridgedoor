@@ -20,7 +20,10 @@ struct FridgedoorApp: App {
                 .onContinueUserActivity(PlatformIntegration.spotlightActivityType) { PlatformIntegration.continueActivity($0) }
                 .onChange(of: scenePhase) { _, phase in
                     guard let store = app.store else { return }
-                    if phase == .active { store.startPolling() } else if phase == .background {
+                    if phase == .active {
+                        store.startPolling()
+                        Task { await ShareCredentialManager.ensureIfDue(store.client) }
+                    } else if phase == .background {
                         store.stopPolling()
                         if !store.pendingDismissals.isEmpty {
                             // The held dismissals are sent now, so their Undo no longer applies.

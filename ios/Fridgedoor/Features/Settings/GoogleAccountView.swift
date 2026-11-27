@@ -264,6 +264,8 @@ private struct DeletePrivateDataSheet: View {
             app.show("Your private data was deleted.")
             await store.refresh()
             await model.load()
+            // Deleting private data also revoked the Share extension's credential: make a new one.
+            await ShareCredentialManager.ensure(model.client)
         } catch {
             failed = true
         }

@@ -160,7 +160,9 @@ app. Everything else works.
 - Google consent happens in the browser: Settings opens the web app's Settings →
   Email page in an in-app Safari sheet.
 - The Share extension uses its own capture-only credential (`/capture/v1`), created
-  at sign-in and revoked at sign-out. It can't read plans.
+  at sign-in, re-created when the app comes to the foreground (checked at most hourly)
+  or after Delete my private data if it was revoked, and revoked at sign-out. It
+  can't read plans.
 - Voice uses on-device speech when available and falls back to server transcription.
 - Widget buttons run their intents in the app's process (`LiveActivityIntent`, see
   `Platform/Intents/WidgetIntents.swift`), launched in the background if needed, with

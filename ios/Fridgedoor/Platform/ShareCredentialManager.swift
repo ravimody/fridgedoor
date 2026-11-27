@@ -8,16 +8,25 @@ import UIKit
 @MainActor
 enum ShareCredentialManager {
     private static var inFlight = false
+    private static var lastChecked: Date?
 
     /// Whether the shared Keychain group works in this build (it may not with a
     /// free personal team's provisioning).
     private(set) static var isAvailable = true
+
+    /// `ensure` at most once an hour: when the app comes to the foreground, so a credential
+    /// revoked from the web (or never created, offline at sign-in) comes back.
+    static func ensureIfDue(_ client: PlannerClient) async {
+        if let lastChecked, Date.now.timeIntervalSince(lastChecked) < 3600 { return }
+        await ensure(client)
+    }
 
     /// Ensures this device has an active credential for `client`'s server and member.
     static func ensure(_ client: PlannerClient) async {
         guard !inFlight else { return }
         inFlight = true
         defer { inFlight = false }
+        lastChecked = .now
 
         if let existing = SharedContainer.captureCredential, existing.serverURL == client.baseURL {
             // Still active for this member? (It may have been revoked from the web's Settings,
@@ -46,5 +55,6 @@ enum ShareCredentialManager {
             try? await client.revokeCaptureCredential(existing.id)
         }
         SharedContainer.storeCaptureCredential(nil)
+        lastChecked = nil
     }
 }
