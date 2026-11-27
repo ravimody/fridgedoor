@@ -1,5 +1,6 @@
 import Foundation
 import FridgedoorKit
+import UIKit
 
 /// An authenticated client for code that can run without the UI: App Intents,
 /// notification actions and background refresh.
@@ -35,6 +36,13 @@ enum PlatformSession {
         let client = PlannerClient(auth: auth)
         headless = client
         return client
+    }
+
+    /// The session can't be read yet because the phone hasn't been unlocked since it
+    /// restarted. Not a sign-out: nothing derived from the account should be cleared.
+    static func isLockedOut() async -> Bool {
+        guard let server = SharedContainer.serverURL else { return !UIApplication.shared.isProtectedDataAvailable }
+        return await AuthSession.shared(for: server).credentialsUnavailable
     }
 
     /// The live store when the app's UI is running and signed in.

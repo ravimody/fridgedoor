@@ -10,6 +10,8 @@ public struct PlannerError: Error, LocalizedError, Equatable, Sendable {
     public init(code: String, status: Int = 0, serverMessage: String? = nil) { self.code = code; self.status = status; self.serverMessage = serverMessage }
 
     public static let signedOut = PlannerError(code: "SIGNED_OUT", status: 401)
+    /// The session is in the Keychain but can't be read until the phone is unlocked.
+    public static let sessionLocked = PlannerError(code: "SESSION_LOCKED")
     public static let offline = PlannerError(code: "OFFLINE")
     public static let serverDown = PlannerError(code: "SERVER_DOWN")
     public static let decoding = PlannerError(code: "UNEXPECTED_RESPONSE")
@@ -35,6 +37,7 @@ public struct PlannerError: Error, LocalizedError, Equatable, Sendable {
     public var userMessage: String {
         switch code {
         case "SIGNED_OUT", "UNAUTHENTICATED", "NATIVE_GRANT_INVALID": "Your session ended. Sign in again to continue."
+        case "SESSION_LOCKED": "Unlock your iPhone, then try again."
         case "OFFLINE": "You're offline. Check your connection and try again."
         case "SERVER_DOWN": "Can't reach the Fridgedoor server. It may be down, or only reachable at home or over a VPN. Try again in a minute."
         case "PAIRING_CODE_USED": "This code was already used. Make a new one in Settings → iPhone on the web."
@@ -81,6 +84,9 @@ public actor AuthSession {
     private let keychain: KeychainStore
     private let urlSession: URLSession
     private var credentials: Credentials?
+    /// The last Keychain read failed for a reason other than "no item" (before first
+    /// unlock): the person may still be signed in, so this is not a sign-out.
+    private var keychainUnreadable = false
     private var refreshTask: Task<Credentials, Error>?
     /// Bumped on every sign-out so a refresh already in flight can't write tokens back.
     private var generation = 0
@@ -113,14 +119,35 @@ public actor AuthSession {
 
     public init(baseURL: URL, keychain: KeychainStore = KeychainStore(), urlSession: URLSession = .shared) {
         self.baseURL = baseURL; self.keychain = keychain; self.urlSession = urlSession
-        self.account = Self.account(for: baseURL)
-        self.credentials = keychain.value(Credentials.self, for: account)
+        let account = Self.account(for: baseURL)
+        self.account = account
+        let read = keychain.read(account)
+        self.credentials = read.data.flatMap { try? JSONDecoder().decode(Credentials.self, from: $0) }
+        if case .unavailable = read { keychainUnreadable = true }
     }
 
     static func account(for baseURL: URL) -> String { "native-session \(baseURL.absoluteString)" }
 
-    public var member: Member? { credentials?.member }
-    public var isSignedIn: Bool { credentials != nil }
+    public var member: Member? { loadFromKeychainIfNeeded(); return credentials?.member }
+    public var isSignedIn: Bool { loadFromKeychainIfNeeded(); return credentials != nil }
+    /// No session in memory because the Keychain couldn't be read yet (the phone hasn't
+    /// been unlocked since it restarted). Callers must not treat this as signed out.
+    public var credentialsUnavailable: Bool { loadFromKeychainIfNeeded(); return credentials == nil && keychainUnreadable }
+
+    /// Reads the Keychain while there are no credentials in memory, so a session that
+    /// couldn't be read before first unlock is picked up once it can be.
+    private func loadFromKeychainIfNeeded() {
+        guard credentials == nil else { return }
+        switch keychain.read(account) {
+        case .found(let data):
+            credentials = try? JSONDecoder().decode(Credentials.self, from: data)
+            keychainUnreadable = false
+        case .absent: keychainUnreadable = false
+        case .unavailable: keychainUnreadable = true
+        }
+    }
+
+    private var missingCredentialsError: PlannerError { keychainUnreadable ? .sessionLocked : .signedOut }
 
     /// `expired` is false only for an explicit `signOut()`.
     public func setSignOutHandler(_ handler: @escaping @Sendable (_ expired: Bool) -> Void) { onSignOut = handler }
@@ -148,7 +175,8 @@ public actor AuthSession {
 
     public func accessToken() async throws -> String {
         if let refreshTask { return try await refreshTask.value.accessToken }
-        guard let credentials else { throw PlannerError.signedOut }
+        loadFromKeychainIfNeeded()
+        guard let credentials else { throw missingCredentialsError }
         if credentials.accessExpiry.timeIntervalSinceNow > 60 { return credentials.accessToken }
         return try await refresh().accessToken
     }
@@ -156,7 +184,8 @@ public actor AuthSession {
     /// Refreshes unless another caller already did after `staleToken` was issued.
     public func refreshAfterRejection(of staleToken: String) async throws -> String {
         if let refreshTask { return try await refreshTask.value.accessToken }
-        guard let credentials else { throw PlannerError.signedOut }
+        loadFromKeychainIfNeeded()
+        guard let credentials else { throw missingCredentialsError }
         if credentials.accessToken != staleToken { return credentials.accessToken }
         return try await refresh().accessToken
     }
