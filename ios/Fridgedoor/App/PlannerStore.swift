@@ -11,6 +11,8 @@ final class PlannerStore {
     private(set) var member: Member
     /// Everyone in the household (from `/me`); just the signed-in member until it loads.
     private(set) var household: [HouseholdPerson] = []
+    /// The household's AI provider, named in consent text.
+    private(set) var aiProvider: AiProviderInfo?
     /// Plans dismissed locally whose server request waits out the Undo window (`dismissWithUndo`).
     var pendingDismissals: [String: PlanSummary] = [:]
     /// One Undo-window timer per held dismissal, cancelled by Undo or an early send.
@@ -162,6 +164,7 @@ final class PlannerStore {
             if let value = value as? MeResponse {
                 member = value.member
                 if let people = value.household, !people.isEmpty { household = people }
+                aiProvider = value.aiProvider
             }
         case .plans: plans = (value as? [PlanSummary])?.filter { pendingDismissals[$0.id] == nil } ?? plans
         case .agenda: agenda = value as? [AgendaItem] ?? agenda

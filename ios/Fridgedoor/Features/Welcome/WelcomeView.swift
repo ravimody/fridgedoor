@@ -57,7 +57,7 @@ struct WelcomeView: View {
                 .foregroundStyle(Color.ink)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
-            Text("Fridgedoor connects to your household's own server, where your plans, lists and calendar live.")
+            Text("Fridgedoor connects to your household's own server, where your plans, lists and calendar live. There's no Fridgedoor account: whoever runs your server invites you.")
                 .font(.body)
                 .foregroundStyle(Color.muted)
                 .fixedSize(horizontal: false, vertical: true)

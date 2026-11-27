@@ -23,6 +23,25 @@ public struct MeResponse: Codable, Sendable {
     public let member: Member
     /// Active members of the household (id and name). Older servers omit it.
     public let household: [HouseholdPerson]?
+    /// The household's AI provider, for consent text. Nil when the server doesn't say
+    /// (older servers, or a custom provider).
+    public let aiProvider: AiProviderInfo?
+}
+
+/// Who the household's AI provider is, as the server describes it.
+public struct AiProviderInfo: Codable, Hashable, Sendable {
+    public let name: String
+    /// A model running on the household's own computer rather than a company's service.
+    public let local: Bool
+
+    public init(name: String, local: Bool) { self.name = name; self.local = local }
+
+    /// "OpenAI, your household's AI provider", for "…are sent to <phrase>." Falls back
+    /// to the generic wording when the provider isn't known.
+    public static func phrase(for provider: AiProviderInfo?) -> String {
+        guard let provider else { return "your household's AI provider" }
+        return provider.local ? "\(provider.name), the AI model on your household's own computer" : "\(provider.name), your household's AI provider"
+    }
 }
 
 /// Someone in the household, for showing and assigning people.
