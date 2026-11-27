@@ -101,7 +101,7 @@ private struct DecisionWidgetRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 4) {
                         if row.isPrivate { Image(systemName: "lock").font(.caption2).foregroundStyle(Color.muted) }
-                        Text(row.title).font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink).lineLimit(1)
+                        Text(row.title).font(.subheadline.weight(.semibold)).foregroundStyle(Color.ink).lineLimit(2)
                     }
                     Text(row.detail).font(.caption).foregroundStyle(Color.muted).lineLimit(1)
                 }
