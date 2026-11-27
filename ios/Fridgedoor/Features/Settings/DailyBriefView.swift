@@ -28,8 +28,8 @@ struct DailyBriefView: View {
 
     /// The full disclosure the switch accepts. Shown verbatim under "Read more".
     static let disclosure = [
-        "The planner can prepare a short private overview for Home using your current plans, calendar context, reminders, recent permitted source metadata and confirmed private facts. It doesn't create events, send messages or mark tasks complete.",
-        "When enabled, this also permits scheduled maintenance suggestions for household knowledge. AI processing is off until you turn it on here. Results are encrypted and kept for one week; usage records contain metadata only and are kept for up to 30 days.",
+        "The planner can prepare a short private morning brief for Home using your current plans, calendar context, reminders, recent permitted source metadata, and your household facts, including ones you haven't confirmed yet. It doesn't create events, send messages or mark to-dos done.",
+        "When enabled, this also permits scheduled maintenance suggestions for household facts. AI processing is off until you turn it on here. Results are encrypted and kept for one week; usage records contain metadata only and are kept for up to 30 days.",
     ]
 
     var body: some View {
@@ -64,7 +64,7 @@ struct DailyBriefView: View {
         Section {
             SettingsSummary(points: [
                 .init("sun.horizon", "The planner writes a short summary of your day for Home."),
-                .init("tray.full", "It reads your plans, calendar, reminders, recent email details and confirmed household facts."),
+                .init("tray.full", "It reads your plans, calendar, reminders, recent email details and household facts, including unconfirmed ones."),
                 .init("hand.raised", "It never creates events, sends messages or completes to-dos."),
             ], details: Self.disclosure)
             if let settings = store.dailySettings {
