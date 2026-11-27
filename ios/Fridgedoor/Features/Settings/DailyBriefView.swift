@@ -121,12 +121,15 @@ struct DailyBriefView: View {
                 .disabled(digestBusy || (!(digest.available ?? false) && !digest.enabled))
                 DatePicker("Time", selection: Binding(get: { time }, set: { time = $0; scheduleSave(enabled: pendingDigest ?? digest.enabled, delay: .milliseconds(900)) }), displayedComponents: .hourAndMinute)
                     .environment(\.timeZone, store.timeZone)
-                    .disabled(!digest.enabled && pendingDigest != true)
+                    // The time also sets this iPhone's own morning alert, so it can change while the
+                    // web notification is off. The server refuses a time change only for an enabled
+                    // notification it can't deliver.
+                    .disabled((pendingDigest ?? digest.enabled) && !(digest.available ?? false))
                 if !(digest.available ?? false) {
                     SettingsNotice(text: digest.enabled ? "Morning delivery isn't set up on the server, so the time can't change right now. You can still turn it off." : "Morning delivery isn't set up on the server yet, so it can't be turned on.", tone: .warning)
                 }
             } footer: {
-                Text("A notification when your brief is ready; it opens Home. Times are in \(settingsTimeZoneName(store.timeZone, fallback: digest.timezone)). Choose which devices alert in Notifications.")
+                Text("A notification when your brief is ready; it opens Home. The time also sets this iPhone's morning alert. Times are in \(settingsTimeZoneName(store.timeZone, fallback: digest.timezone)). Choose which devices alert in Notifications.")
             }
             .plannerRows()
         } else {
@@ -169,7 +172,8 @@ struct DailyBriefView: View {
             PlatformPreferences.shared.serverDigest = saved
             PlatformSync.resync()
             changed += 1
-            app.show(enabled ? "Morning notification set for \(localTimeLabel(localTime, in: store.timeZone))." : "Morning notification turned off.")
+            let label = localTimeLabel(localTime, in: store.timeZone)
+            app.show(enabled ? "Morning notification set for \(label)." : enabled != digest.enabled ? "Morning notification turned off." : "Morning time set to \(label).")
         } catch {
             queued = nil
             if !(error is CancellationError || (error as? URLError)?.code == .cancelled) {
