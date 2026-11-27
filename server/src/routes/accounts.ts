@@ -7,7 +7,7 @@ import { z, ZodError } from 'zod';
 import type { Variables } from '../app.js';
 import type { MemberRecord } from '../auth/access.js';
 import { profileInput, setupInput, type AccountService, type AttemptLimiter } from '../auth/accounts.js';
-import { sessionCookie, type SessionStore } from '../auth/session.js';
+import { expiredCookie, sessionCookie, type SessionStore } from '../auth/session.js';
 import type { AppConfig } from '../config.js';
 import type { SettingsStore } from '../settings.js';
 
@@ -24,6 +24,8 @@ type Deps = {
   memberById: (id: string) => MemberRecord | undefined;
   /** Pause before checking a password while the account is seeing many failures. */
   loginDelayMs?: number;
+  /** Removes a member's email, private plans and requests (Settings → Email → Delete my private data). */
+  deletePrivateData?: (memberId: string) => void;
 };
 
 const fail = (c: C, status: 400 | 401 | 403 | 404 | 409 | 422 | 429, code: string) => c.json({ error: { code, message: code.replaceAll('_', ' ').toLowerCase(), requestId: c.get('requestId') } }, status, { 'Cache-Control': 'no-store' });
@@ -33,7 +35,7 @@ const failure = (c: C, error: unknown) => {
   const code = error instanceof Error ? error.message : '';
   if (code === 'FORBIDDEN') return fail(c, 403, code);
   if (code === 'NOT_FOUND' || code === 'INVITE_INVALID') return fail(c, 404, code);
-  if (['EMAIL_IN_USE', 'SETUP_ALREADY_DONE', 'CANNOT_REMOVE_SELF', 'ALREADY_MEMBER', 'MEMBER_REMOVED'].includes(code)) return fail(c, 409, code);
+  if (['EMAIL_IN_USE', 'SETUP_ALREADY_DONE', 'CANNOT_REMOVE_SELF', 'ALREADY_MEMBER', 'MEMBER_REMOVED', 'OWNER_CANNOT_DELETE'].includes(code)) return fail(c, 409, code);
   if (code === 'PASSWORD_INCORRECT') return fail(c, 403, code);
   throw error;
 };
@@ -167,6 +169,18 @@ export function registerAccountRoutes(app: Hono<{ Variables: Variables }>, deps:
       try { await deps.accounts.changePassword(member(c), input.currentPassword, input.newPassword, sessionId(c)); }
       catch (error) { if (error instanceof Error && error.message === 'PASSWORD_INCORRECT') deps.limiter.fail(`password:${member(c).id}`); throw error; }
       return c.json({ data: { changed: true } });
+    } catch (error) { return failure(c, error); }
+  });
+  // The web app and the iPhone app (through /native/v1/account/delete) both call this.
+  app.post('/dashboard/api/v1/account/delete', async (c) => {
+    try {
+      const input = z.object({ confirm: z.literal(true), password: z.string().max(200).optional() }).strict().parse(await c.req.json());
+      const key = `account-delete:${member(c).id}`;
+      if (deps.limiter.blocked(key)) return fail(c, 429, 'TOO_MANY_ATTEMPTS');
+      try { await deps.accounts.deleteAccount(member(c), input.password, deps.deletePrivateData ?? (() => undefined)); }
+      catch (error) { if (error instanceof Error && error.message === 'PASSWORD_INCORRECT') deps.limiter.fail(key); throw error; }
+      c.header('Set-Cookie', expiredCookie(deps.config.APP_ORIGIN.startsWith('https:')));
+      return c.json({ data: { deleted: true } }, 200, { 'Cache-Control': 'no-store' });
     } catch (error) { return failure(c, error); }
   });
   app.post('/dashboard/api/v1/devices/pairing', async (c) => {

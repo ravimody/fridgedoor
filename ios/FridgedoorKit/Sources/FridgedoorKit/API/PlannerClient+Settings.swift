@@ -12,6 +12,13 @@ public extension PlannerClient {
     func revokeNativeSession(_ id: String) async throws {
         _ = try await send(.delete, "native-sessions/\(id)", as: DeletedResponse.self)
     }
+
+    /// Deletes the signed-in member's account on the server and ends every session,
+    /// this one included. Owners get `OWNER_CANNOT_DELETE`.
+    func deleteAccount(password: String) async throws {
+        struct Body: Encodable, Sendable { let confirm = true; let password: String }
+        _ = try await send(.post, "account/delete", body: Body(password: password), as: DeletedResponse.self)
+    }
 }
 
 // MARK: Google connection and sources
