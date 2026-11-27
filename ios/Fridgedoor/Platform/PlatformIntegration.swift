@@ -22,6 +22,7 @@ enum PlatformIntegration {
             let assertion = await BackgroundWork.begin(name)
             return { await assertion.end() }
         }
+        FileSink.removeLeftovers()
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
         NotificationScheduler.registerCategories()
         BackgroundRefresh.register()
