@@ -109,6 +109,22 @@ the server signs in as the second member.
 Boot at most one or two simulators at a time. Each runs hundreds of processes, and
 several together can exhaust the macOS per-user process limit.
 
+
+### A public demo server
+
+App Review (or anyone you want to show Fridgedoor to) needs a server to sign in to.
+[`deploy/demo/compose.yaml`](../deploy/demo/compose.yaml) runs the same preview server
+in Docker for a public https address, such as `https://demo.example.org`:
+
+```sh
+PREVIEW_ORIGIN=https://demo.example.org docker compose -f deploy/demo/compose.yaml up -d
+```
+
+Point a tunnel or https proxy for that address at `127.0.0.1:8899`. Anyone who opens it
+is signed in as Alex after one confirmation, so there are no credentials to share.
+Everything is synthetic, AI and Google are fakes and outbound network is blocked. Each
+start seeds a fresh household dated from today, so restart it daily.
+
 ## Connecting to a server
 
 There is no default server. A signed-out app offers:

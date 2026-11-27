@@ -22,6 +22,7 @@ install scripts), `docs/`. Architecture: [docs/architecture.md](docs/architectur
   lint with `pnpm lint`.
 - iOS: `cd ios && xcodegen generate`, then build in Xcode; `cd ios/FridgedoorKit && swift test`.
 - Local synthetic data for the iPhone app: `pnpm --filter @fridgedoor/server dev:native`.
+  `deploy/demo/compose.yaml` runs it as a public demo (App Review); see ios/README.md.
 - UX reviews follow [.claude/skills/ux-review/SKILL.md](.claude/skills/ux-review/SKILL.md).
   Their output goes in the gitignored `work/` folder.
 
