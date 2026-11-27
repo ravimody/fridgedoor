@@ -29,7 +29,9 @@ struct ReviewStatusLine: View {
             .padding(.vertical, 6)
             .padding(.horizontal, 12)
             .background(Color.soft.opacity(0.7), in: .capsule)
-            .contentShape(.capsule)
+            // The capsule looks compact; taps land across 44pt.
+            .frame(minHeight: 44)
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityHint("Shows brief details")

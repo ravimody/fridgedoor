@@ -336,10 +336,13 @@ private struct MorningUndoBar: View {
             Image(systemName: "eye.slash").foregroundStyle(Color.muted)
             Text("Dismissed from your brief").font(.subheadline).foregroundStyle(Color.ink)
             Spacer()
-            Button("Undo") { home.undoDismiss() }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.plannerAccent)
-                .disabled(home.isBusy("undo"))
+            Button { home.undoDismiss() } label: {
+                Text("Undo").frame(minWidth: 44, minHeight: 44).contentShape(.rect)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Color.plannerAccent)
+            .disabled(home.isBusy("undo"))
+            .padding(.vertical, -12)
         }
         .plannerCard(.plain, padding: 14)
     }
@@ -363,7 +366,10 @@ private struct OfflineBanner: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Button("Retry", action: retry).font(.subheadline.weight(.semibold)).foregroundStyle(Color.plannerAccent)
+            Button(action: retry) { Text("Retry").frame(minWidth: 44, minHeight: 44).contentShape(.rect) }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.plannerAccent)
+                .padding(.vertical, -12)
         }
         .plannerCard(.soft, padding: 12)
     }

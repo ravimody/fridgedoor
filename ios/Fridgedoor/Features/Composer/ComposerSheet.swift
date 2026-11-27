@@ -374,6 +374,9 @@ struct FlowChips: View {
                         .padding(.vertical, 8)
                         .frame(minHeight: 36)
                         .background(Color.soft, in: .capsule)
+                        // Looks 36pt tall, takes taps across 44pt.
+                        .padding(.vertical, 4)
+                        .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
             }

@@ -132,7 +132,7 @@ struct RequestDetailView: View {
                     Link(destination: url) {
                         Label(url.host() ?? url.absoluteString, systemImage: "safari")
                             .font(.subheadline)
-                            .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     }
                     .foregroundStyle(Color.plannerAccent)
                 }
