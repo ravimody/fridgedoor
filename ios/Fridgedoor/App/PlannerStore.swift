@@ -13,6 +13,8 @@ final class PlannerStore {
     private(set) var household: [HouseholdPerson] = []
     /// Plans dismissed locally whose server request waits out the Undo window (`dismissWithUndo`).
     var pendingDismissals: [String: PlanSummary] = [:]
+    /// One Undo-window timer per held dismissal, cancelled by Undo or an early send.
+    var dismissalTimers: [String: Task<Void, Never>] = [:]
     /// Held dismissals whose request is in flight; they can no longer be undone or re-sent.
     var committingDismissals: Set<String> = []
 

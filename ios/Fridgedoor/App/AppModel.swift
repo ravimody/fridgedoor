@@ -180,6 +180,15 @@ final class AppModel {
 
     func signOut() async {
         store?.stopPolling()
+        // Dismissals held for Undo would otherwise be lost with the session. Bounded like the
+        // Share credential revoke, so signing out offline isn't held up.
+        if let store, !store.pendingDismissals.isEmpty {
+            dismissToast()
+            let flush = Task { await store.flushPendingDismissals() }
+            let timeout = Task { try? await Task.sleep(for: .seconds(5)); flush.cancel() }
+            await flush.value
+            timeout.cancel()
+        }
         await PlatformIntegration.willSignOut(self)
         await client?.auth.signOut()
         didSignOut(expired: false)

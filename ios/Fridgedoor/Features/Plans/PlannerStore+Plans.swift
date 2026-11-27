@@ -37,8 +37,10 @@ extension PlannerStore {
         invalidateInFlightRefresh([.plans])
         plans.removeAll { $0.id == plan.id }
         app.show("Dismissed “\(plan.effectiveFacts.title)”.", action: Toast.Action(label: "Undo") { [weak self, weak app] in self?.undoDismissal(plan.id, app: app) })
-        Task { [weak self] in
+        dismissalTimers[plan.id]?.cancel()
+        dismissalTimers[plan.id] = Task { [weak self, weak app] in
             try? await Task.sleep(for: Toast.undoWindow + .seconds(1))
+            guard !Task.isCancelled else { return }
             await self?.commitDismissal(plan.id, app: app)
         }
     }
@@ -49,12 +51,15 @@ extension PlannerStore {
             app?.show("Already dismissed. You can find it under Plans → Dismissed.")
             return
         }
+        // A later dismissal of the same plan gets its own full Undo window.
+        dismissalTimers.removeValue(forKey: id)?.cancel()
         replace(plan)
     }
 
     func commitDismissal(_ id: String, app: AppModel?) async {
         guard let plan = pendingDismissals[id], !committingDismissals.contains(id) else { return }
         committingDismissals.insert(id)
+        dismissalTimers.removeValue(forKey: id)?.cancel()
         defer { committingDismissals.remove(id); pendingDismissals[id] = nil }
         do {
             _ = try await client.dismissPlan(plan.id, expectedRevision: plan.revision)
@@ -65,7 +70,7 @@ extension PlannerStore {
         }
     }
 
-    /// Sends any held dismissals now (the app is going to the background).
+    /// Sends any held dismissals now (the app is going to the background, or signing out).
     func flushPendingDismissals() async {
         for id in Array(pendingDismissals.keys) { await commitDismissal(id, app: nil) }
     }
