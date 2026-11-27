@@ -44,3 +44,13 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
 ];
 
 export function presetFor(id: string): ProviderPreset | undefined { return PROVIDER_PRESETS.find((preset) => preset.id === id); }
+
+/**
+ * Who the household's AI provider is, for consent text in the apps: "OpenAI", or a model
+ * running on the household's own computer. Null when unconfigured or `custom` (unknown).
+ */
+export function aiProviderDisclosure(providerId: string | undefined): { name: string; local: boolean } | null {
+  const preset = providerId ? presetFor(providerId) : undefined;
+  if (!preset || preset.id === 'custom') return null;
+  return { name: preset.label.replace(/\s*\(.*\)$/, ''), local: !preset.needsApiKey };
+}

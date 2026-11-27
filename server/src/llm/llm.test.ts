@@ -189,3 +189,14 @@ describe('schemas and the hub', () => {
     expect(createProvider({ provider: 'gemini', apiKey: 'g', models: {} }).capabilities.webSearch).toBe(false);
   });
 });
+
+describe('aiProviderDisclosure', () => {
+  it('names the provider for consent text, and says when it runs at home', async () => {
+    const { aiProviderDisclosure } = await import('./presets.js');
+    expect(aiProviderDisclosure('openai')).toEqual({ name: 'OpenAI', local: false });
+    expect(aiProviderDisclosure('anthropic')).toEqual({ name: 'Anthropic', local: false });
+    expect(aiProviderDisclosure('ollama')).toEqual({ name: 'Ollama', local: true });
+    expect(aiProviderDisclosure('custom')).toBeNull();
+    expect(aiProviderDisclosure(undefined)).toBeNull();
+  });
+});
