@@ -1,0 +1,26 @@
+# A public demo server with the synthetic household (Alex and Sam), for App Review or
+# for showing Fridgedoor to someone. Fake AI, fake Google and no outbound network:
+# nothing real is stored or sent anywhere. Anyone who opens it is signed in as Alex.
+#
+# Run from a checkout of the repository:
+#   PREVIEW_ORIGIN=https://demo.example.org docker compose -f deploy/demo/compose.yaml up -d
+# then point a tunnel or HTTPS proxy for that address at 127.0.0.1:8899.
+# Each start seeds a fresh household dated from today; restart it daily to keep it fresh.
+services:
+  demo:
+    image: node:22.23.3-alpine3.24
+    working_dir: /src
+    command: sh -c "apk add --no-cache python3 make g++ >/dev/null && corepack enable && pnpm install --frozen-lockfile && pnpm --filter @fridgedoor/contracts build && exec pnpm --filter @fridgedoor/server dev:native"
+    environment:
+      PREVIEW_HOST: 0.0.0.0
+      PREVIEW_ORIGIN: ${PREVIEW_ORIGIN:?Set PREVIEW_ORIGIN to the demo's public https address}
+      PORT: "8899"
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    volumes:
+      - ../..:/src
+      - demo-node-modules:/src/node_modules
+    ports:
+      - "127.0.0.1:8899:8899"
+    restart: unless-stopped
+volumes:
+  demo-node-modules:

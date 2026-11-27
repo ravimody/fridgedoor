@@ -5,7 +5,9 @@
  * fake providers, and blocks every outbound network request.
  *
  * Usage: pnpm --filter @fridgedoor/server dev:native [-- --reset]
- * Env:   PORT (default 8899), PREVIEW_DB (reuse a file), PREVIEW_MEMBER=alex|sam
+ * Env:   PORT (default 8899), PREVIEW_DB (reuse a file), PREVIEW_MEMBER=alex|sam,
+ *        PREVIEW_HOST (address to listen on, default 127.0.0.1) and PREVIEW_ORIGIN (the
+ *        public https address, for a demo behind a tunnel or proxy, such as one for App Review)
  *
  * Synthetic development data only. Never point this at a real Fridgedoor database.
  */
@@ -63,9 +65,10 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const ZONE = 'America/New_York';
-const HOST = '127.0.0.1';
+const HOST = process.env.PREVIEW_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.PORT ?? 8899);
-const ORIGIN = `http://${HOST}:${PORT}`;
+// Behind a tunnel the public address differs from the listening one; sign-in checks it exactly.
+const ORIGIN = process.env.PREVIEW_ORIGIN ? new URL(process.env.PREVIEW_ORIGIN).origin : `http://${HOST}:${PORT}`;
 // Stable so an existing PREVIEW_DB stays decryptable across restarts. Not a real secret.
 const PREVIEW_SECRET = 'preview-only-synthetic-session-secret-not-for-production';
 const CHAT_MODEL = 'preview-synthetic-chat';
@@ -553,7 +556,7 @@ console.log([
   `  Database   ${dbPath}${reuse ? ' (reused, not reseeded)' : tempDir ? ' (temporary, deleted on exit)' : ' (seeded)'}`,
   `  Contents   ${counts.plans} active plans, ${counts.events} calendar events, ${counts.listItems} list items, ${counts.runs} assistant requests`,
   '',
-  '  Use 127.0.0.1 (not localhost): sign-in confirmation checks the exact origin.',
+  process.env.PREVIEW_ORIGIN ? `  Listening  http://${HOST}:${PORT}` : '  Use 127.0.0.1 (not localhost): sign-in confirmation checks the exact origin.',
   '',
 ].join('\n'));
 
