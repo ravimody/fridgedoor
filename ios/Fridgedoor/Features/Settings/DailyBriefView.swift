@@ -97,7 +97,9 @@ struct DailyBriefView: View {
         aiBusy = true
         defer { aiBusy = false; pendingAi = nil }
         do {
-            store.dailySettings = try await store.client.setDailySettings(enabled: enabled, expectedRevision: settings.revision, consentVersion: settings.disclosureVersion)
+            let saved = try await store.client.setDailySettings(enabled: enabled, expectedRevision: settings.revision, consentVersion: settings.disclosureVersion)
+            store.invalidateInFlightRefresh([.dailySettings])
+            store.dailySettings = saved
             changed += 1
             app.show(enabled ? "Morning brief turned on." : "Morning brief turned off.")
             await store.refresh([.dailyOverview])

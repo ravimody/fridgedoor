@@ -131,7 +131,7 @@ final class HomeState {
         // `run` would skip the request while an answer is saving; don't hide the card for nothing.
         guard !busy.contains(busyId) else { return }
         let index = store.clarifications.firstIndex { $0.id == clarification.id } ?? 0
-        store.invalidateInFlightRefresh()
+        store.invalidateInFlightRefresh([.clarifications])
         store.clarifications.removeAll { $0.id == clarification.id }
         dismissedCount += 1
         Task { [self] in
