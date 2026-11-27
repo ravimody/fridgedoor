@@ -143,7 +143,7 @@ struct WelcomeView: View {
             HStack(spacing: 4) {
                 Button("Scan pairing code") { showScanner = true }
                 Text("·").foregroundStyle(Color.muted).accessibilityHidden(true)
-                Button("Use a different server") { app.forgetServer() }
+                Button("Switch server") { app.forgetServer() }
             }
             .font(.footnote)
             .foregroundStyle(Color.plannerAccent)

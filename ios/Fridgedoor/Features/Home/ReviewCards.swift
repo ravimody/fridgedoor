@@ -140,7 +140,7 @@ struct ReminderCard: View {
             HStack(spacing: 8) {
                 Button("Done", systemImage: "checkmark") { home.completeReminder(reminder) }
                     .buttonStyle(PlannerButtonStyle(kind: .secondary, size: .small))
-                Button("Snooze 15 minutes", systemImage: "moon.zzz") { home.snoozeReminder(reminder) }
+                Button("Remind me in 15 minutes", systemImage: "bell") { home.snoozeReminder(reminder) }
                     .buttonStyle(PlannerButtonStyle(kind: .quiet, size: .small))
                 Spacer(minLength: 0)
                 Menu {
@@ -150,9 +150,9 @@ struct ReminderCard: View {
                     Button("Cancel reminder", systemImage: "bell.slash", role: .destructive) { home.cancelReminder(reminder) }
                 } label: {
                     Image(systemName: "ellipsis").font(.body.weight(.semibold)).foregroundStyle(Color.muted)
-                        .frame(width: 44, height: 36).contentShape(.rect)
+                        .frame(width: 44, height: 44).contentShape(.rect)
                 }
-                .accessibilityLabel("More reminder options")
+                .accessibilityLabel("Reminder actions")
             }
             .labelStyle(.titleAndIcon)
         }

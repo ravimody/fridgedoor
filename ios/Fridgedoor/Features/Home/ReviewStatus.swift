@@ -75,7 +75,7 @@ struct ReviewDetailsSheet: View {
                             ForEach(coverage, id: \.channel) { entry in
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
-                                        Label(entry.channel.capitalized, systemImage: entry.symbol)
+                                        Label(entry.displayName, systemImage: entry.symbol)
                                             .foregroundStyle(Color.ink)
                                         Spacer()
                                         Text(entry.statusLabel)
@@ -135,9 +135,28 @@ extension DailyView {
 extension DailyCoverage {
     var isIncomplete: Bool { ["stale", "unavailable", "truncated"].contains(status) }
 
+    /// The server's channel ids in the app's words (DESIGN.md): "tasks" are to-dos, "knowledge" is household facts.
+    var displayName: String {
+        switch channel {
+        case "tasks": "To-dos"
+        case "knowledge": "Household facts"
+        default: channel.prefix(1).uppercased() + channel.dropFirst()
+        }
+    }
+
+    /// What the channel holds, mid-sentence ("to-dos", "calendar items").
+    private var itemsNoun: String {
+        switch channel {
+        case "tasks": "to-dos"
+        case "knowledge": "household facts"
+        case "email": "emails"
+        case "plans", "reminders": channel
+        default: "\(channel) items"
+        }
+    }
+
     var shortNotice: String {
-        let name = channel.prefix(1).uppercased() + channel.dropFirst()
-        return "\(name): " + (status == "truncated" ? "brief limit reached" : status == "stale" ? "sync delayed" : "data unavailable")
+        "\(displayName): " + (status == "truncated" ? "brief limit reached" : status == "stale" ? "sync delayed" : "data unavailable")
     }
 
     var statusLabel: String {
@@ -153,9 +172,9 @@ extension DailyCoverage {
 
     var longNotice: String? {
         switch status {
-        case "truncated": "\(omittedCount ?? 0) \(channel) items were outside the brief’s size limit."
-        case "stale": "The last \(channel) sync is older than expected; recent changes may be missing."
-        case "unavailable": "\(channel.prefix(1).uppercased() + channel.dropFirst()) data could not be loaded for this brief."
+        case "truncated": "\(omittedCount ?? 0) \(itemsNoun) were outside the brief’s size limit."
+        case "stale": "The last \(displayName.lowercased()) sync is older than expected; recent changes may be missing."
+        case "unavailable": "\(itemsNoun.prefix(1).uppercased() + itemsNoun.dropFirst()) couldn't be loaded for this brief."
         default: nil
         }
     }
