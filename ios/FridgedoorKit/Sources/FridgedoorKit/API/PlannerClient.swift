@@ -108,8 +108,8 @@ public actor AuthSession {
     private let keychain: KeychainStore
     private let urlSession: URLSession
     private var credentials: Credentials?
-    /// The last Keychain read failed for a reason other than "no item" (before first
-    /// unlock): the person may still be signed in, so this is not a sign-out.
+    /// The last Keychain read failed because the phone hasn't been unlocked since it
+    /// restarted: the person may still be signed in, so this is not a sign-out.
     private var keychainUnreadable = false
     private var refreshTask: Task<Credentials, Error>?
     /// Bumped on every sign-out so a refresh already in flight can't write tokens back.
@@ -154,7 +154,7 @@ public actor AuthSession {
         self.account = account
         let read = keychain.read(account)
         self.credentials = read.data.flatMap { try? JSONDecoder().decode(Credentials.self, from: $0) }
-        if case .unavailable = read { keychainUnreadable = true }
+        keychainUnreadable = read == .locked
     }
 
     static func account(for baseURL: URL) -> String { "native-session \(baseURL.absoluteString)" }
@@ -173,8 +173,8 @@ public actor AuthSession {
         case .found(let data):
             credentials = try? JSONDecoder().decode(Credentials.self, from: data)
             keychainUnreadable = false
-        case .absent: keychainUnreadable = false
-        case .unavailable: keychainUnreadable = true
+        case .absent, .failed: keychainUnreadable = false
+        case .locked: keychainUnreadable = true
         }
     }
 

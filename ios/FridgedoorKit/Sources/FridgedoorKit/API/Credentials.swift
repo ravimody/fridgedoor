@@ -23,18 +23,21 @@ struct TokenResponse: Decodable, Sendable {
     var credentials: Credentials { Credentials(accessToken: accessToken, accessTokenExpiresAt: accessTokenExpiresAt, refreshToken: refreshToken, refreshTokenExpiresAt: refreshTokenExpiresAt, member: member) }
 }
 
-/// The result of a Keychain read. `unavailable` means the item may exist but can't be read
-/// right now, typically because the phone hasn't been unlocked since it restarted.
+/// The result of a Keychain read. `locked` means the item may exist but can't be read until
+/// the phone is unlocked for the first time since it restarted. Any other failure (a missing
+/// entitlement, a damaged item) won't fix itself, so it's `failed`.
 public enum KeychainRead: Equatable, Sendable {
     case found(Data)
     case absent
-    case unavailable(OSStatus)
+    case locked
+    case failed(OSStatus)
 
     init(status: OSStatus, result: CFTypeRef?) {
         switch status {
         case errSecSuccess: self = (result as? Data).map(KeychainRead.found) ?? .absent
         case errSecItemNotFound: self = .absent
-        default: self = .unavailable(status)
+        case errSecInteractionNotAllowed: self = .locked
+        default: self = .failed(status)
         }
     }
 

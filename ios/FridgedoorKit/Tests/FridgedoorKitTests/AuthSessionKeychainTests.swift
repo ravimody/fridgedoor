@@ -7,7 +7,7 @@ import Testing
 /// Before first unlock the Keychain refuses reads: that must not look like signing out.
 @Suite struct AuthSessionKeychainTests {
     private final class FakeKeychain: Sendable {
-        let next = Mutex<KeychainRead>(.unavailable(errSecInteractionNotAllowed))
+        let next = Mutex<KeychainRead>(.locked)
         var store: KeychainStore {
             var store = KeychainStore(service: "dev.fridgedoor.tests.\(UUID().uuidString)")
             store.readOverride = { _ in self.next.withLock { $0 } }
@@ -21,7 +21,8 @@ import Testing
 
     @Test func classifiesKeychainStatuses() {
         #expect(KeychainRead(status: errSecItemNotFound, result: nil) == .absent)
-        #expect(KeychainRead(status: errSecInteractionNotAllowed, result: nil) == .unavailable(errSecInteractionNotAllowed))
+        #expect(KeychainRead(status: errSecInteractionNotAllowed, result: nil) == .locked)
+        #expect(KeychainRead(status: errSecMissingEntitlement, result: nil) == .failed(errSecMissingEntitlement))
         #expect(KeychainRead(status: errSecSuccess, result: Data("x".utf8) as CFData) == .found(Data("x".utf8)))
     }
 
@@ -40,9 +41,10 @@ import Testing
         #expect(try await auth.accessToken() == "access")
     }
 
-    @Test func absentKeychainItemIsSignedOut() async {
+    @Test(arguments: [KeychainRead.absent, .failed(errSecMissingEntitlement)])
+    func missingOrBrokenKeychainItemIsSignedOut(read: KeychainRead) async {
         let keychain = FakeKeychain()
-        keychain.next.withLock { $0 = .absent }
+        keychain.next.withLock { $0 = read }
         let auth = AuthSession(baseURL: URL(string: "https://fridgedoor.example.test")!, keychain: keychain.store)
         #expect(await auth.credentialsUnavailable == false)
         await #expect(throws: PlannerError.signedOut) { try await auth.accessToken() }
