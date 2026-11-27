@@ -155,8 +155,9 @@ app. Everything else works.
   use Web Push. The morning alert skips days with nothing on the calendar and no
   decisions waiting. A pending alert whose text or time changed is replaced, and the
   app keeps at most 60 pending (the soonest), under iOS's limit of 64.
-- Operator details (server, AI provider and limits, sync counts, Gmail label ids) are
-  in Settings → Help & diagnostics, not on the everyday pages.
+- Operator details (server, AI provider and limits, sync counts, Gmail label ids,
+  recent request ids and models) are in Settings → Help & diagnostics, not on the
+  everyday pages.
 - Google consent happens in the browser: Settings opens the web app's Settings →
   Email page in an in-app Safari sheet.
 - The Share extension uses its own capture-only credential (`/capture/v1`), created
