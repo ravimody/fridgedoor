@@ -96,7 +96,7 @@ struct ReviewCard: View {
         }
         if canDismiss {
             Divider()
-            Button("Dismiss", systemImage: "eye.slash", role: .destructive) { home.dismiss(item) }
+            Button("Dismiss", systemImage: "eye.slash") { home.dismiss(item) }
         }
     }
 
