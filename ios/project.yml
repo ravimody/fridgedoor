@@ -63,7 +63,7 @@ targets:
         # Home servers often have no certificate. ServerAddress (FridgedoorKit) only
         # allows http for local hosts; NSAllowsLocalNetworking covers IP addresses,
         # single-label names and .local, the exceptions cover the other local suffixes.
-        NSAppTransportSecurity:
+        NSAppTransportSecurity: &localNetworkATS
           NSAllowsLocalNetworking: true
           NSExceptionDomains:
             ts.net: { NSIncludesSubdomains: true, NSExceptionAllowsInsecureHTTPLoads: true }
@@ -147,6 +147,8 @@ targets:
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
               NSExtensionActivationSupportsImageWithMaxCount: 1
               NSExtensionActivationSupportsFileWithMaxCount: 1
+        # Same as the app: Share uploads to the same (possibly plain-http, local) server.
+        NSAppTransportSecurity: *localNetworkATS
         PlannerAppGroup: group.$(FRIDGEDOOR_BUNDLE_PREFIX)
         PlannerKeychainGroup: $(AppIdentifierPrefix)$(FRIDGEDOOR_BUNDLE_PREFIX).shared
     settings:
