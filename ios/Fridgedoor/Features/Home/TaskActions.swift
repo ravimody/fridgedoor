@@ -40,12 +40,9 @@ struct LaterMenu<MenuLabel: View>: View {
     var body: some View {
         Menu {
             Section("Later") {
-                Button("Tomorrow", systemImage: "sunrise") { home.snooze(task, days: 1) }
-                if let weekend = LaterDates.weekend(from: .now, calendar: store.calendar) {
-                    Button("This weekend", systemImage: "sun.max") { home.snooze(task, to: weekend) }
-                }
-                if let nextWeek = LaterDates.nextWeek(from: .now, calendar: store.calendar) {
-                    Button("Next week", systemImage: "calendar") { home.snooze(task, to: nextWeek) }
+                // The same picks and dates as the To do list's Later sheet.
+                ForEach(LaterOption.distinct(in: store.timeZone), id: \.option) { pick in
+                    Button(pick.option.label, systemImage: pick.option.systemImage) { home.snooze(task, to: pick.date) }
                 }
                 Button("Pick a date…", systemImage: "calendar.day.timeline.left") { home.datePickerTask = task }
             }
@@ -53,20 +50,6 @@ struct LaterMenu<MenuLabel: View>: View {
             label()
         }
         .accessibilityLabel("Later")
-    }
-}
-
-/// Quick "Later" dates in the member's calendar.
-enum LaterDates {
-    /// The coming Saturday (next week's if today is already the weekend).
-    static func weekend(from now: Date, calendar: Calendar) -> Date? {
-        let today = calendar.startOfDay(for: now)
-        return calendar.nextDate(after: today, matching: DateComponents(weekday: 7), matchingPolicy: .nextTime)
-    }
-
-    /// The coming Monday.
-    static func nextWeek(from now: Date, calendar: Calendar) -> Date? {
-        calendar.nextDate(after: calendar.startOfDay(for: now), matching: DateComponents(weekday: 2), matchingPolicy: .nextTime)
     }
 }
 
