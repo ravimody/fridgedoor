@@ -117,6 +117,10 @@ private struct SettingsRootList: View {
             Section {
                 Button("Sign out", role: .destructive) { confirmSignOut = true }
                     .frame(maxWidth: .infinity, minHeight: 44)
+                NavigationLink { DeleteAccountView() } label: {
+                    Text("Delete my account").foregroundStyle(Color.danger)
+                }
+                .frame(minHeight: 44)
             }
             .plannerRows()
         }

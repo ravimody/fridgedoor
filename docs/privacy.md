@@ -83,6 +83,11 @@ policy, or use a local model through Ollama or LM Studio to keep everything at h
   mailbox. Plans they shared stay. It doesn't remove copies in existing backups, and
   for Google it doesn't revoke access on Google's side (do that at
   [myaccount.google.com/permissions](https://myaccount.google.com/permissions)).
+- Settings → Profile → Delete my account (Settings → Delete my account in the iPhone
+  app) does all of that, then removes the person's sign-in and signs them out
+  everywhere. Plans and list items they shared stay with the household, shown as from
+  "Former member". The household's owner runs the server, so their account can't be
+  deleted this way; to delete everything, stop the server and remove its data folder.
 - Logs contain error codes and job details, never email content, prompts or answers.
   Until setup is finished, the server prints the setup link (with its one-time token)
   to the log when it starts.

@@ -19,7 +19,7 @@ export function AccountSection() {
   const { member } = useSession();
   const { household } = useHousehold();
   const self = household?.members.find((candidate) => candidate.id === member?.id);
-  return <AccountCard name={self?.displayName ?? member?.displayName} email={self?.email} />;
+  return <AccountCard name={self?.displayName ?? member?.displayName} email={self?.email} owner={self?.role === 'owner'} />;
 }
 
 /** The household's name, people and (for owners) invites. */
@@ -32,16 +32,42 @@ export function HouseholdSection() {
   </section>;
 }
 
-function AccountCard({ name, email }: { name?: string | undefined; email?: string | undefined }) {
+function AccountCard({ name, email, owner }: { name?: string | undefined; email?: string | undefined; owner: boolean }) {
   const { signOut } = useSession();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<'password' | 'delete' | null>(null);
   const [notice, setNotice] = useState('');
   return <section className="card settings-card"><h2>Profile</h2>
     <dl className="account-summary"><dt>Name</dt><dd>{name ?? '…'}</dd>{email && <><dt>Email</dt><dd>{email}</dd></>}</dl>
     {notice && <p role="status" className="notice">{notice}</p>}
-    {open ? <ChangePassword onDone={(message) => { setOpen(false); setNotice(message); }} onCancel={() => setOpen(false)} />
-      : <div className="button-row"><button className="secondary" onClick={() => { setNotice(''); setOpen(true); }}>Change password</button><button className="secondary" onClick={() => void signOut()}>Sign out</button></div>}
+    {open === 'password' ? <ChangePassword onDone={(message) => { setOpen(null); setNotice(message); }} onCancel={() => setOpen(null)} />
+      : open === 'delete' ? <DeleteAccount owner={owner} onCancel={() => setOpen(null)} />
+      : <div className="button-row"><button className="secondary" onClick={() => { setNotice(''); setOpen('password'); }}>Change password</button><button className="secondary" onClick={() => void signOut()}>Sign out</button><button className="secondary" onClick={() => { setNotice(''); setOpen('delete'); }}>Delete my account</button></div>}
   </section>;
+}
+
+/** Deletes the signed-in member's account. Owners run the server, so they're told how to leave instead. */
+function DeleteAccount({ owner, onCancel }: { owner: boolean; onCancel: () => void }) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (owner) return <div className="settings-form">
+    <p>You’re the household’s owner, so your account can’t be deleted here. To delete everything, stop the server and remove its data folder.</p>
+    <div className="button-row"><button type="button" className="secondary" onClick={onCancel}>Back</button></div>
+  </div>;
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true); setError('');
+    try {
+      await apiFetch('/account/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true, ...(password ? { password } : {}) }) });
+      window.location.assign('/dashboard/login');
+    } catch (caught) { setError(errorMessage(caught, { PASSWORD_INCORRECT: 'That password isn’t right. Try again.', OWNER_CANNOT_DELETE: 'Owners can’t delete their account here.' })); setBusy(false); }
+  }
+  return <form className="settings-form" onSubmit={(event) => void submit(event)} noValidate>
+    <p>This deletes your email connection, private plans, requests and settings, and signs you out everywhere. Plans and list items you shared stay with the household, shown as from “Former member”. This can’t be undone.</p>
+    <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus /></label>
+    <FormError message={error} />
+    <div className="button-row"><button type="submit" disabled={busy}>{busy ? 'Deleting…' : 'Delete my account'}</button><button type="button" className="secondary" onClick={onCancel}>Cancel</button></div>
+  </form>;
 }
 
 function ChangePassword({ onDone, onCancel }: { onDone: (message: string) => void; onCancel: () => void }) {

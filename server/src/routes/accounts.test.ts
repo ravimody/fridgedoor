@@ -340,3 +340,56 @@ describe('browser session plumbing', () => {
     expect(await encoded.json()).toMatchObject({ error: { code: 'NATIVE_UNSUPPORTED' } });
   });
 });
+
+describe('deleting your own account', () => {
+  async function withSam() {
+    const ctx = setup(); const { cookie, csrf } = await createOwner(ctx);
+    const auth = { Cookie: cookie, 'X-CSRF-Token': csrf, Origin: 'http://fridgedoor.local:8080', 'Content-Type': 'application/json' };
+    const token = ((await (await ctx.app.request('/dashboard/api/v1/household/invites', { method: 'POST', headers: auth })).json()) as { data: { url: string } }).data.url.split('/').pop()!;
+    const joined = await ctx.app.request(`/dashboard/api/v1/auth/invites/${token}`, json({ displayName: 'Sam', email: 'sam@example.test', password: 'another long one', timezone: 'America/Chicago' }, { Origin: 'http://fridgedoor.local:8080' }));
+    const body = await joined.json() as { data: { member: { id: string }; csrfToken: string } };
+    const samAuth = { Cookie: cookieOf(joined), 'X-CSRF-Token': body.data.csrfToken, Origin: 'http://fridgedoor.local:8080', 'Content-Type': 'application/json' };
+    return { ctx, auth, samAuth, samId: body.data.member.id };
+  }
+  const del = (headers: Record<string, string>, body: unknown) => ({ method: 'POST', headers, body: JSON.stringify(body) });
+
+  it('needs the password, then removes the sign-in, private data and sessions but keeps the household', async () => {
+    const { ctx, auth, samAuth, samId } = await withSam();
+    const now = new Date().toISOString();
+    ctx.db.prepare('INSERT INTO digest_settings (member_id, enabled, local_time, revision, updated_at) VALUES (?, 1, ?, 1, ?)').run(samId, '07:00', now);
+    expect((await ctx.app.request('/dashboard/api/v1/account/delete', del(samAuth, { confirm: true, password: 'wrong password!' }))).status).toBe(403);
+    expect((await ctx.app.request('/dashboard/api/v1/account/delete', del(samAuth, { confirm: true }))).status).toBe(403);
+    const response = await ctx.app.request('/dashboard/api/v1/account/delete', del(samAuth, { confirm: true, password: 'another long one' }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('set-cookie')).toMatch(/Max-Age=0/);
+    expect((await ctx.app.request('/dashboard/api/v1/me', { headers: { Cookie: samAuth.Cookie } })).status).toBe(401);
+    expect(ctx.db.prepare('SELECT 1 FROM member_logins WHERE member_id = ?').get(samId)).toBeUndefined();
+    expect(ctx.db.prepare('SELECT 1 FROM digest_settings WHERE member_id = ?').get(samId)).toBeUndefined();
+    expect(ctx.db.prepare('SELECT display_name as name, active, allowed_email as email FROM members WHERE id = ?').get(samId)).toEqual({ name: 'Former member', active: 0, email: '' });
+    const login = await ctx.app.request('http://fridgedoor.local:8080/dashboard/api/v1/auth/login', json({ email: 'sam@example.test', password: 'another long one' }, { Origin: 'http://fridgedoor.local:8080' }));
+    expect(login.status).toBe(401);
+    // The owner is unaffected, and the email can be invited again.
+    expect((await ctx.app.request('/dashboard/api/v1/me', { headers: { Cookie: auth.Cookie } })).status).toBe(200);
+    const people = await (await ctx.app.request('/dashboard/api/v1/household', { headers: { Cookie: auth.Cookie } })).json() as { data: { members: Array<{ id: string }> } };
+    expect(people.data.members.map((person) => person.id)).not.toContain(samId);
+    const again = ((await (await ctx.app.request('/dashboard/api/v1/household/invites', { method: 'POST', headers: auth })).json()) as { data: { url: string } }).data.url.split('/').pop()!;
+    expect((await ctx.app.request(`/dashboard/api/v1/auth/invites/${again}`, json({ displayName: 'Sam', email: 'sam@example.test', password: 'another long one', timezone: 'America/Chicago' }, { Origin: 'http://fridgedoor.local:8080' }))).status).toBe(200);
+  });
+
+  it('refuses the owner, who runs the server', async () => {
+    const { ctx, auth } = await withSam();
+    const response = await ctx.app.request('/dashboard/api/v1/account/delete', del(auth, { confirm: true, password: owner.password }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code: 'OWNER_CANNOT_DELETE' } });
+  });
+
+  it('works from the iPhone app and ends its session', async () => {
+    const { ctx, samAuth } = await withSam();
+    const pairing = await (await ctx.app.request('/dashboard/api/v1/devices/pairing', { method: 'POST', headers: samAuth })).json() as { data: { link: string } };
+    const code = new URL(pairing.data.link).searchParams.get('code')!;
+    const tokens = await (await ctx.app.request('/native/v1/auth/token', json({ grantType: 'pairing_code', code }))).json() as { data: { accessToken: string } };
+    const bearer = { Authorization: `Bearer ${tokens.data.accessToken}`, 'Content-Type': 'application/json' };
+    expect((await ctx.app.request('/native/v1/account/delete', del(bearer, { confirm: true, password: 'another long one' }))).status).toBe(200);
+    expect((await ctx.app.request('/native/v1/me', { headers: bearer })).status).toBe(401);
+  });
+});

@@ -48,6 +48,13 @@ The app needs your server to be reachable over HTTPS from the phone: a Tailscale
 `*.ts.net` address, your own domain, or your hosting platform's address. A plain
 `http://` address only works on your home network.
 
+## Leaving
+
+Settings → Sign out signs this iPhone out. Settings → Delete my account deletes your
+account on the household's server and signs you out everywhere; see
+[What leaves your server](privacy.md) for what it removes. The household's owner can't
+delete their own account this way.
+
 ## Installing it
 
 Build the app yourself with Xcode on a Mac; see [ios/README.md](../ios/README.md). A

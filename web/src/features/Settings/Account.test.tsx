@@ -74,3 +74,30 @@ it('hides management for members who are not owners', async () => {
   expect(screen.queryByRole('button', { name: 'Invite someone' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
 });
+
+it('a member deletes their account with their password', async () => {
+  household = { ...household, canManage: false, members: household.members.map((person) => ({ id: person.id, displayName: person.displayName, active: person.active, role: person.role })) };
+  const assign = vi.fn(); Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, assign } });
+  const sam = { ...member, id: 'm2', displayName: 'Sam' };
+  vi.mocked(apiFetch).mockImplementation(async (path, init) => {
+    if (path === '/household') return { data: household };
+    if (path === '/account/delete') { const body = JSON.parse(String(init?.body)) as { password?: string }; if (body.password !== 'right one') throw new Error('PASSWORD_INCORRECT'); return { data: { deleted: true } }; }
+    throw new Error(`unexpected ${path}`);
+  });
+  render(<SessionContext.Provider value={{ member: sam, signOut }}><AccountSection /></SessionContext.Provider>);
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete my account' }));
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('That password isn’t right');
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'right one' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }));
+  await waitFor(() => expect(assign).toHaveBeenCalledWith('/dashboard/login'));
+});
+
+it('tells the owner their account can’t be deleted here', async () => {
+  renderSections();
+  await screen.findAllByText('alex@example.test');
+  fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }));
+  expect(screen.getByText(/You’re the household’s owner/)).toBeInTheDocument();
+  expect(screen.queryByLabelText('Password')).toBeNull();
+});

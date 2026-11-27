@@ -76,7 +76,7 @@ export class AccountService {
 
   household(member: MemberRecord) {
     const manage = this.canManage(member);
-    const members = (this.db.prepare(`SELECT ${memberColumns}, l.email, m.role FROM members m LEFT JOIN member_logins l ON l.member_id = m.id WHERE m.household_id = ? ORDER BY m.created_at`).all(member.householdId) as Array<MemberRow & { email: string | null; role: Role }>)
+    const members = (this.db.prepare(`SELECT ${memberColumns}, l.email, m.role FROM members m LEFT JOIN member_logins l ON l.member_id = m.id WHERE m.household_id = ? AND m.access_subject NOT LIKE 'deleted:%' ORDER BY m.created_at`).all(member.householdId) as Array<MemberRow & { email: string | null; role: Role }>)
       .map((row) => ({ id: row.id, displayName: row.displayName, active: Boolean(row.active), role: row.role, ...(manage && row.email ? { email: row.email } : {}) }));
     const invites = manage ? this.db.prepare('SELECT id, created_at as createdAt, expires_at as expiresAt FROM household_invites WHERE household_id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ? ORDER BY created_at').all(member.householdId, this.clock().toISOString()) as Array<{ id: string; createdAt: string; expiresAt: string }> : [];
     return { name: this.householdName(member.householdId), canManage: manage, members, invites };
@@ -129,6 +129,27 @@ export class AccountService {
     if (result.changes !== 1) throw new Error('NOT_FOUND');
     if (!active) this.revokeAll(memberId);
     return { active };
+  }
+
+  /**
+   * A member deletes their own account: `deletePrivateData` removes their email, private plans,
+   * requests and settings first, then their sign-in is removed, their name is replaced and they
+   * are signed out everywhere. What they shared with the household (plans, list items) stays,
+   * shown as from "Former member". Owners run the server, so they can't delete themselves here.
+   */
+  async deleteAccount(member: MemberRecord, password: string | undefined, deletePrivateData: (memberId: string) => void) {
+    if (this.role(member.id) === 'owner') throw new Error('OWNER_CANNOT_DELETE');
+    const login = this.db.prepare('SELECT password_hash as hash FROM member_logins WHERE member_id = ?').get(member.id) as { hash: string } | undefined;
+    if (login && !(password && await verifyPassword(password, login.hash))) throw new Error('PASSWORD_INCORRECT');
+    deletePrivateData(member.id);
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM member_logins WHERE member_id = ?').run(member.id);
+      // A new access subject frees the old one, so the person can be invited again later.
+      this.db.prepare("UPDATE members SET active = 0, display_name = 'Former member', allowed_email = '', access_subject = ? WHERE id = ?").run(`deleted:${member.id}`, member.id);
+      this.revokeAll(member.id);
+      this.db.prepare('DELETE FROM calendar_feeds WHERE member_id = ?').run(member.id);
+    })();
+    return { deleted: true };
   }
 
   async changePassword(member: MemberRecord, current: string, next: string, keepSessionId?: string) {
